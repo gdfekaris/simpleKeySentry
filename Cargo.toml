@@ -14,6 +14,9 @@ path = "src/main.rs"
 [dependencies]
 thiserror = "2"
 anyhow = "1"
+zeroize = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+chrono = "0.4"
 
 [profile.release]
 lto = true
