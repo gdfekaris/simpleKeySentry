@@ -1,0 +1,5 @@
+sk_live_ABCDEFGHIJKLMNOPQRSTUVWXa
+STRIPE_SECRET=sk_live_1234567890abcdefghijklmnop
+export STRIPE_KEY=sk_live_aBcDeFgHiJkLmNoPqRsTuVwX
+sk_live_51ABCDEFGHIJKLMNOPQRSTUVWXa
+sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxx

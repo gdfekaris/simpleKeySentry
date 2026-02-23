@@ -1,0 +1,5 @@
+Authorization: Bearer short
+Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
+Authorization: Token abcdefghijklmnopqrstuvwxyz1234
+X-Auth-Token: abcdefghijklmnopqrstuvwxyz1234
+Bearer abcdefghijklmnopqrstuvwxyz1234

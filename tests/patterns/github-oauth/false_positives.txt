@@ -1,0 +1,5 @@
+gho_tooshort
+ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
+GHO_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
+not-an-oauth-token
+oauth_token=regular_token_no_prefix

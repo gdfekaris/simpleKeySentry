@@ -1,0 +1,5 @@
+SG.xxxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyyy
+SENDGRID_API_KEY=SG.ABCDEFGHIJKLMNOPQRSTUVWx.abcdefghijklmnopqrstuvwx
+export SG_KEY=SG.1234567890abcdefghijklmn.opqrstuvwxyzABCDEFGHIJKLMN
+SG.aBcDeFgHiJkLmNoPqRsTuVwX.XwVuTsRqPoNmLkJiHgFeDcBa
+SG.zzzzzzzzzzzzzzzzzzzzzzzz.zzzzzzzzzzzzzzzzzzzzzzzz

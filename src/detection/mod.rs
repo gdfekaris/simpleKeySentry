@@ -1,6 +1,12 @@
+pub mod entropy;
+pub mod heuristics;
+pub mod patterns;
+
+use std::path::Path;
+
 use regex::{Regex, RegexSet};
 
-use crate::models::{ContentItem, Finding, SecretType, SecretValue, SourceLocation};
+use crate::models::{ContentItem, Finding, SecretType, SecretValue, SourceLocation, SourceType};
 use crate::SksError;
 
 // ---------------------------------------------------------------------------
@@ -45,22 +51,12 @@ impl CompiledPattern {
 }
 
 // ---------------------------------------------------------------------------
-// Hooks for Block 6
+// EntropyAnalyzer trait
 // ---------------------------------------------------------------------------
 
 /// Adjusts confidence based on the entropy of the matched value.
-///
-/// The no-op implementation is used until Block 6 wires in the real analyzer.
 pub trait EntropyAnalyzer {
     fn confidence_delta(&self, value: &str) -> f64;
-}
-
-/// A single heuristic that adjusts confidence based on content context.
-///
-/// Examples (Block 6): key-value proximity (+0.20), placeholder pattern (−0.30).
-pub trait Heuristic {
-    fn name(&self) -> &str;
-    fn confidence_delta(&self, item: &ContentItem, value: &str) -> f64;
 }
 
 struct NoopEntropyAnalyzer;
@@ -69,6 +65,40 @@ impl EntropyAnalyzer for NoopEntropyAnalyzer {
     fn confidence_delta(&self, _value: &str) -> f64 {
         0.0
     }
+}
+
+// ---------------------------------------------------------------------------
+// HeuristicContext
+// ---------------------------------------------------------------------------
+
+/// All contextual information available to a heuristic when it evaluates a match.
+pub struct HeuristicContext<'a> {
+    /// The raw matched value (capture group 1, or the full match as fallback).
+    pub matched_text: &'a str,
+    /// The complete source line containing the match.
+    pub full_line: &'a str,
+    /// Up to 3 lines that precede the matched line.
+    pub lines_before: &'a [String],
+    /// Up to 3 lines that follow the matched line.
+    pub lines_after: &'a [String],
+    /// Path to the source file.
+    pub file_path: &'a Path,
+    /// Source type of the collector that produced this item.
+    pub source_type: SourceType,
+}
+
+// ---------------------------------------------------------------------------
+// Heuristic trait
+// ---------------------------------------------------------------------------
+
+/// A single heuristic that adjusts confidence based on content context.
+///
+/// Each heuristic returns a delta in `[−0.30, +0.20]`.  Implementing `Send +
+/// Sync` allows the engine to be used from multiple threads (e.g., with rayon
+/// in a later block).
+pub trait Heuristic: Send + Sync {
+    fn name(&self) -> &str;
+    fn evaluate(&self, context: &HeuristicContext) -> f64;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,8 +112,8 @@ impl EntropyAnalyzer for NoopEntropyAnalyzer {
 ///   entirely before any capture-group extraction is attempted.
 /// - The confidence pipeline runs for every match: base score → entropy
 ///   adjustment → heuristic adjustments → clamp to [0.0, 1.0].
-/// - Entropy and heuristic slots are no-ops until Block 6 plugs in the real
-///   implementations.
+/// - Use [`DetectionEngine::new`] for a bare engine (no entropy / heuristics) or
+///   [`DetectionEngine::with_defaults`] to wire in the full pipeline.
 pub struct DetectionEngine {
     patterns: Vec<CompiledPattern>,
     /// Pre-built from pattern regexes for fast multi-pattern first-pass.
@@ -93,7 +123,11 @@ pub struct DetectionEngine {
 }
 
 impl DetectionEngine {
-    /// Construct the engine from a list of compiled patterns.
+    /// Construct a bare engine from a list of compiled patterns.
+    ///
+    /// The entropy analyzer is a no-op and no heuristics are applied; only
+    /// the base confidence score from each matching pattern is used. This is
+    /// suitable for unit-testing pattern logic in isolation.
     ///
     /// An empty pattern list is valid; `analyze` will always return `[]`.
     pub fn new(patterns: Vec<CompiledPattern>) -> Self {
@@ -108,6 +142,18 @@ impl DetectionEngine {
             entropy_analyzer: Box::new(NoopEntropyAnalyzer),
             heuristics: Vec::new(),
         }
+    }
+
+    /// Construct an engine pre-loaded with the full confidence pipeline:
+    /// [`entropy::ShannonEntropyAnalyzer`] and all built-in heuristics from
+    /// [`heuristics::all_heuristics`].
+    ///
+    /// This is the recommended constructor for production use.
+    pub fn with_defaults(patterns: Vec<CompiledPattern>) -> Self {
+        let mut engine = Self::new(patterns);
+        engine.entropy_analyzer = Box::new(entropy::ShannonEntropyAnalyzer);
+        engine.heuristics = heuristics::all_heuristics();
+        engine
     }
 
     /// Analyze a single content item and return all findings.
@@ -176,15 +222,26 @@ impl DetectionEngine {
     /// Runs the confidence pipeline for a single match.
     ///
     /// 1. Base score from the pattern.
-    /// 2. Entropy adjustment (no-op until Block 6).
-    /// 3. Heuristic adjustments (no-op until Block 6).
+    /// 2. Entropy adjustment.
+    /// 3. Heuristic adjustments.
     /// 4. Clamp result to [0.0, 1.0].
     fn compute_confidence(&self, rule: &PatternRule, value: &str, item: &ContentItem) -> f64 {
         let mut score = rule.base_confidence;
         score += self.entropy_analyzer.confidence_delta(value);
+
+        let ctx = HeuristicContext {
+            matched_text: value,
+            full_line: &item.line,
+            lines_before: &item.context_before,
+            lines_after: &item.context_after,
+            file_path: &item.path,
+            source_type: item.source_type.clone(),
+        };
+
         for h in &self.heuristics {
-            score += h.confidence_delta(item, value);
+            score += h.evaluate(&ctx);
         }
+
         score.clamp(0.0, 1.0)
     }
 }
@@ -198,7 +255,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    use crate::models::{SecretType, SourceType};
+    use crate::models::{SecretType, Severity, SourceType};
 
     fn make_item(line: &str) -> ContentItem {
         ContentItem {
@@ -208,6 +265,17 @@ mod tests {
             context_before: Vec::new(),
             context_after: Vec::new(),
             source_type: SourceType::EnvFile,
+        }
+    }
+
+    fn make_item_at(line: &str, path: &str) -> ContentItem {
+        ContentItem {
+            path: PathBuf::from(path),
+            line_number: 1,
+            line: line.to_string(),
+            context_before: Vec::new(),
+            context_after: Vec::new(),
+            source_type: SourceType::Dotfile,
         }
     }
 
@@ -271,7 +339,7 @@ mod tests {
         assert_eq!(findings[0].value.raw(), "TEST_SECRET_ABCDEFGH");
     }
 
-    // --- Confidence pipeline ---
+    // --- Confidence pipeline (bare engine — no entropy or heuristics) ---
 
     #[test]
     fn confidence_equals_base_score_when_no_adjustments() {
@@ -348,5 +416,69 @@ mod tests {
             remediation: "N/A".to_string(),
         };
         assert!(CompiledPattern::compile(rule).is_err());
+    }
+
+    // --- Full confidence pipeline (with_defaults) ---
+
+    /// Acceptance test from the Block 6 spec:
+    ///
+    /// `export AKIAIOSFODNN7EXAMPLE` → base 0.95 + AssignmentContext +0.10
+    /// − PlaceholderDetection −0.30 = **0.75** (High, not Critical).
+    ///
+    /// The matched value "AKIAIOSFODNN7EXAMPLE" has entropy ≈ 3.69 which is
+    /// below the alphanumeric threshold (4.0), so the entropy delta is 0.0.
+    /// No other heuristics fire for this bare `export` line without a `=`.
+    #[test]
+    fn pipeline_test_placeholder_key_scores_high() {
+        use crate::detection::patterns::all_patterns;
+
+        let patterns: Vec<CompiledPattern> = all_patterns()
+            .into_iter()
+            .map(|p| CompiledPattern::compile(p).unwrap())
+            .collect();
+        let engine = DetectionEngine::with_defaults(patterns);
+
+        let item = make_item_at("export AKIAIOSFODNN7EXAMPLE", "/tmp/deploy.sh");
+        let findings = engine.analyze(&item);
+
+        let f = findings
+            .iter()
+            .find(|f| f.matched_pattern.as_deref() == Some("aws-access-key-id"))
+            .expect("aws-access-key-id finding not produced");
+
+        assert!(
+            (f.confidence - 0.75).abs() < 1e-10,
+            "expected 0.75, got {}",
+            f.confidence
+        );
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    /// A genuinely high-entropy AWS key in the same context should score
+    /// Critical (1.0 after clamping):
+    /// base 0.95 + entropy +0.10 + AssignmentContext +0.10 = 1.15 → clamped to 1.0.
+    ///
+    /// "AKIAQZXCWSREDFVTGBYH": A appears twice, remaining 18 chars are unique.
+    /// H ≈ 4.22 > ALPHANUM_THRESHOLD 4.0 → entropy delta = +0.10.
+    #[test]
+    fn pipeline_test_real_looking_key_scores_critical() {
+        use crate::detection::patterns::all_patterns;
+
+        let patterns: Vec<CompiledPattern> = all_patterns()
+            .into_iter()
+            .map(|p| CompiledPattern::compile(p).unwrap())
+            .collect();
+        let engine = DetectionEngine::with_defaults(patterns);
+
+        let item = make_item_at("export AKIAQZXCWSREDFVTGBYH", "/tmp/deploy.sh");
+        let findings = engine.analyze(&item);
+
+        let f = findings
+            .iter()
+            .find(|f| f.matched_pattern.as_deref() == Some("aws-access-key-id"))
+            .expect("aws-access-key-id finding not produced");
+
+        assert_eq!(f.confidence, 1.0);
+        assert_eq!(f.severity, Severity::Critical);
     }
 }

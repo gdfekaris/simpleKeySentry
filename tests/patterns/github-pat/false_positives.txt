@@ -1,0 +1,5 @@
+ghp_tooshort
+gh_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
+gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
+GHP_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
+not-a-github-token-at-all

@@ -1,0 +1,5 @@
+github_pat_ABCDEFGHIJKLMNOPQRSTUVWXa
+github_pat_11ABCDEFQ0abcdefghijklmnop
+GITHUB_TOKEN=github_pat_aBcDeFgHiJkLmNoPqRsTuVwX
+export TOKEN=github_pat_XyZaBcDeFgHiJkLmNoPqRsT
+github_pat_1234567890abcdefghijklmnop
