@@ -294,7 +294,7 @@ impl Collector for EnvFileCollector {
                     // Prune hardcoded excluded directory names.
                     if e.file_type().is_dir() {
                         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                            if EXCLUDED_DIRS.iter().any(|&ex| ex == name) {
+                            if EXCLUDED_DIRS.contains(&name) {
                                 return false;
                             }
                         }
