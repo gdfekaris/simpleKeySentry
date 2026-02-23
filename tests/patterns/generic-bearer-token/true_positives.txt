@@ -1,0 +1,5 @@
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+Authorization: Bearer abcdefghijklmnopqrstuvwxyz1234
+Authorization:Bearer ABCDEFGHIJKLMNOPQRSTUVWXYZ1234
+AUTHORIZATION: BEARER some-long-token-value-here-1234
+Authorization: bearer 1234567890abcdefghijklmnopqrstuvwx

@@ -1,0 +1,5 @@
+redis://localhost:6379
+amqp://rabbitmq.example.com:5672
+postgres://user:pass@localhost/db
+redis://user@cache.example.com
+http://user:pass@example.com

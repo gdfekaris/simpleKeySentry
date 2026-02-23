@@ -1,0 +1,5 @@
+eyJhbGci.short.x
+not.a.jwt.token.at.all
+eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0
+base64encodedbutnotajwt
+eyJ.tooshort.x

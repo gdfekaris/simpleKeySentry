@@ -1,0 +1,5 @@
+xoxp-123-456-AbCdEfGhIjKlMnOpQrStUvWx
+xoxb-1234567890-1234567890-AbCdEfGhIjKlMnOpQrStUvWx
+XOXP-1234567890-1234567890-AbCdEfGhIjKlMnOpQrStUvWx
+xoxp-1234567890-AbCdEfGhIjKlMnOpQrStUvWx
+not-a-slack-user-token

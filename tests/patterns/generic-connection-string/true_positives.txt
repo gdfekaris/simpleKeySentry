@@ -1,0 +1,5 @@
+redis://user:password@localhost:6379
+REDIS_URL=redis://default:s3cr3t@cache.example.com:6379/0
+amqp://guest:guestpass@rabbitmq.example.com:5672/vhost
+rabbitmq://admin:r4bb1tPass@mq.internal:5672
+export BROKER_URL=amqp://app:P4ssw0rd@broker.internal/myvhost

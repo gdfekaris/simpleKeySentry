@@ -1,0 +1,8 @@
+export SECRET=supersecretvalue123
+export TOKEN=mytoken12345678
+export API_KEY=abcdefghijklmnop
+export PASSWORD=myp@ssw0rd123
+export SECRET_KEY=longSecretKeyValue123
+export PASSWD=hunter2hunter
+export API_KEY_PROD=production_key_value_here
+export SECRET_TOKEN=some-very-secret-token-here

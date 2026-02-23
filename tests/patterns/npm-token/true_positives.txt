@@ -1,0 +1,5 @@
+npm_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
+NPM_TOKEN=npm_1234567890abcdefghijklmnopqrstuvwxyz
+export NPM_AUTH_TOKEN=npm_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890
+//registry.npmjs.org/:_authToken=npm_XyZaBcDeFgHiJkLmNoPqRsTuVwXyZ1234567
+npm_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz

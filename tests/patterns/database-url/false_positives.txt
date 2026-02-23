@@ -1,0 +1,5 @@
+postgres://localhost:5432/mydb
+https://user:pass@example.com/path
+redis://user:pass@localhost:6379
+postgres://user@localhost/mydb
+ftp://anonymous:anon@ftp.example.com/

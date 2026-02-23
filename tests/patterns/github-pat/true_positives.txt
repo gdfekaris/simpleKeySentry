@@ -1,0 +1,5 @@
+ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
+ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
+GITHUB_TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyzAB
+token: ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890
+export GITHUB_PAT=ghs_XyZaBcDeFgHiJkLmNoPqRsTuVwXyZ1234567

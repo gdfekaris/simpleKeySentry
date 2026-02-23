@@ -1,0 +1,5 @@
+BKIAIOSFODNN7EXAMPLE
+AKIA_HAS_UNDERSCORES_XX
+akiaiosfodnn7example
+AKIAIOSFODNN7EXAMPL
+not-an-aws-key-at-all

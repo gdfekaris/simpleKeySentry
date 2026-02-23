@@ -1,0 +1,5 @@
+HEROKU_API_KEY=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+heroku_token=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+heroku_key: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+HEROKU_TOKEN=ffffffff-eeee-dddd-cccc-bbbbbbbbbbbb
+heroku=00000000-1111-2222-3333-444444444444

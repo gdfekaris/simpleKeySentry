@@ -1,0 +1,5 @@
+password=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+db_password=hunter2
+secret_access_key=tooshort
+api_token=wJalrXUtnFEMI/K7MDENG/bPxRfiCY
