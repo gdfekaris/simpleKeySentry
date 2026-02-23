@@ -227,9 +227,7 @@ impl Collector for DotfileCollector {
         let mut items = Vec::new();
         for raw in &config.dotfile_targets {
             let path = expand_tilde(raw);
-            if let Some(found) =
-                try_read_file(&path, SourceType::Dotfile, config.max_file_size)?
-            {
+            if let Some(found) = try_read_file(&path, SourceType::Dotfile, config.max_file_size)? {
                 items.extend(found);
             }
         }
@@ -331,8 +329,7 @@ impl Collector for EnvFileCollector {
                     continue;
                 }
 
-                if let Some(found) =
-                    try_read_file(path, SourceType::EnvFile, config.max_file_size)?
+                if let Some(found) = try_read_file(path, SourceType::EnvFile, config.max_file_size)?
                 {
                     items.extend(found);
                 }
@@ -658,7 +655,10 @@ mod tests {
 
         // .env in a project subdirectory.
         let project_env = dir.join("myproject/.env");
-        write_file(&project_env, "DATABASE_URL=postgres://user:s3cr3t@host/db\n");
+        write_file(
+            &project_env,
+            "DATABASE_URL=postgres://user:s3cr3t@host/db\n",
+        );
 
         // .env.production two levels deep.
         let prod_env = dir.join("myproject/config/.env.production");
