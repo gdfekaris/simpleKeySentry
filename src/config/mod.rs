@@ -133,6 +133,7 @@ impl Default for ReportConfig {
 // ─── Platform-aware defaults ──────────────────────────────────────────────────
 
 fn default_dotfile_targets(home: &Path) -> Vec<PathBuf> {
+    #[allow(unused_mut)]
     let mut targets = vec![
         home.join(".bashrc"),
         home.join(".zshrc"),
