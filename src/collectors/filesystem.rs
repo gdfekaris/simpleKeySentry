@@ -26,7 +26,7 @@ use crate::SksError;
 
 /// Lines longer than this are truncated to prevent memory issues from minified
 /// files or binary blobs accidentally named `.env`.
-const MAX_LINE_BYTES: usize = 4096;
+pub(crate) const MAX_LINE_BYTES: usize = 4096;
 
 /// Number of bytes inspected at the start of a file for binary detection.
 const BINARY_CHECK_BYTES: usize = 512;
@@ -51,14 +51,14 @@ const EXCLUDED_DIRS: &[&str] = &[
 // Private helpers
 // ---------------------------------------------------------------------------
 
-fn home_dir() -> PathBuf {
+pub(crate) fn home_dir() -> PathBuf {
     std::env::var("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."))
 }
 
 /// Expands a leading `~` or `~/` to the user's home directory.
-fn expand_tilde(path: &Path) -> PathBuf {
+pub(crate) fn expand_tilde(path: &Path) -> PathBuf {
     let s = path.to_string_lossy();
     if s == "~" {
         home_dir()
@@ -71,7 +71,7 @@ fn expand_tilde(path: &Path) -> PathBuf {
 
 /// Returns `true` if the first [`BINARY_CHECK_BYTES`] of the file contain a
 /// null byte — the standard heuristic for detecting binary files.
-fn is_binary(path: &Path) -> bool {
+pub(crate) fn is_binary(path: &Path) -> bool {
     let Ok(mut file) = File::open(path) else {
         return false;
     };
@@ -84,7 +84,7 @@ fn is_binary(path: &Path) -> bool {
 ///
 /// Latin-1 maps every byte value `0x00–0xFF` directly to the corresponding
 /// Unicode code point, so it can decode any byte sequence without error.
-fn read_content(path: &Path) -> Result<String, SksError> {
+pub(crate) fn read_content(path: &Path) -> Result<String, SksError> {
     let bytes = fs::read(path)?;
     match String::from_utf8(bytes.clone()) {
         Ok(s) => Ok(s),
@@ -100,7 +100,7 @@ fn read_content(path: &Path) -> Result<String, SksError> {
 
 /// Truncates `s` to at most [`MAX_LINE_BYTES`] bytes (at a char boundary),
 /// appending `"  [truncated]"` so readers know the line is incomplete.
-fn truncate_line(s: &str) -> String {
+pub(crate) fn truncate_line(s: &str) -> String {
     if s.len() <= MAX_LINE_BYTES {
         return s.to_string();
     }
