@@ -1,4 +1,6 @@
-# Simple Key Sentry v0.1.0
+# simpleKeySentry (sks) 
+
+## v0.1.0
 
 A privacy-first local secrets scanner. Finds leaked credentials in shell history, dotfiles, and environment files on your own machine — without sending anything off it.
 
@@ -38,7 +40,7 @@ cargo build --release
 
 # The binary is at target/release/sks
 # Copy it somewhere on your PATH:
-cp target/release/sks ~/.local/bin/
+cp target/release/sks ~/.local/bin/sks
 ```
 
 ## Quick start
