@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.82"
 description = "A privacy-first local secrets scanner"
 license = "MIT"
-repository = "https://github.com/PLACEHOLDER/simple-key-sentry"
+repository = "https://github.com/gdfekaris/simpleKeySentry"
 
 [[bin]]
 name = "sks"

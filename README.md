@@ -34,8 +34,8 @@ Requires Rust 1.82+.
 
 ```bash
 # Clone and build
-git clone https://github.com/PLACEHOLDER/simple-key-sentry.git
-cd simple-key-sentry
+git clone https://github.com/gdfekaris/simpleKeySentry.git
+cd simpleKeySentry
 cargo build --release
 
 # The binary is at target/release/sks
