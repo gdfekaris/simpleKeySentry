@@ -34,6 +34,7 @@ use crate::detection::{CompiledPattern, DetectionEngine};
 use crate::models::{
     Collector, ContentItem, Finding, Reporter, ScanMetadata, ScanResult, SourceType,
 };
+use crate::reporting::html::HtmlReporter;
 use crate::reporting::json::JsonReporter;
 use crate::reporting::terminal::TerminalReporter;
 
@@ -87,7 +88,7 @@ struct ScanArgs {
     #[arg(value_name = "PATH")]
     path: Option<PathBuf>,
 
-    /// Output format [terminal|json]
+    /// Output format [terminal|json|html]
     #[arg(short, long, value_name = "FORMAT")]
     format: Option<String>,
 
@@ -128,9 +129,10 @@ impl ScanArgs {
                 let fmt = match f.to_lowercase().as_str() {
                     "terminal" => ReportFormat::Terminal,
                     "json" => ReportFormat::Json,
+                    "html" => ReportFormat::Html,
                     other => {
                         return Err(format!(
-                            "Unknown format '{other}': expected terminal or json"
+                            "Unknown format '{other}': expected terminal, json, or html"
                         ))
                     }
                 };
@@ -378,6 +380,7 @@ fn run_scan(args: ScanArgs) -> i32 {
     let reporter: Box<dyn Reporter> = match config.report.format {
         ReportFormat::Terminal => Box::new(TerminalReporter),
         ReportFormat::Json => Box::new(JsonReporter),
+        ReportFormat::Html => Box::new(HtmlReporter),
         _ => {
             eprintln!(
                 "sks error: format '{:?}' is not yet supported; using terminal",
@@ -500,6 +503,16 @@ mod tests {
         };
         let overrides = args.to_overrides().unwrap();
         assert_eq!(overrides.format, Some(ReportFormat::Terminal));
+    }
+
+    #[test]
+    fn scan_args_format_html() {
+        let args = ScanArgs {
+            format: Some("html".to_string()),
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        assert_eq!(overrides.format, Some(ReportFormat::Html));
     }
 
     #[test]
