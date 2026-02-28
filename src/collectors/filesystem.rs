@@ -112,7 +112,11 @@ pub(crate) fn truncate_line(s: &str) -> String {
 }
 
 /// Converts file text into [`ContentItem`]s with a ±2-line context window.
-fn content_to_items(path: &Path, source_type: SourceType, text: &str) -> Vec<ContentItem> {
+pub(crate) fn content_to_items(
+    path: &Path,
+    source_type: SourceType,
+    text: &str,
+) -> Vec<ContentItem> {
     let lines: Vec<String> = text.lines().map(truncate_line).collect();
     let n = lines.len();
     lines

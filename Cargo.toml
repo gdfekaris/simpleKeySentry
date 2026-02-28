@@ -23,6 +23,8 @@ regex = "1"
 walkdir = "2" # recursive directory traversal for EnvFileCollector
 serde_json = "1" # JSON reporter output serialization
 clap = { version = "4", features = ["derive"] } # CLI argument parsing
+serde_yaml_ng = "0.10" # YAML config parsing for structured file extractor
+rust-ini = "0.21" # INI config parsing for structured file extractor
 
 [profile.release]
 lto = true
