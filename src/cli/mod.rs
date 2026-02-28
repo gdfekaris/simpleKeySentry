@@ -13,12 +13,14 @@
 //! | 1    | Findings found above threshold |
 //! | 2    | Scan error (config parse failure, etc.) |
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 
+use crate::cache::{self, CacheEntry, ScanCache};
 use crate::collectors::app_config::AppConfigCollector;
 use crate::collectors::cloud_cli::CloudCliCollector;
 use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
@@ -112,6 +114,10 @@ struct ScanArgs {
     /// Disable entropy analysis
     #[arg(long)]
     no_entropy: bool,
+
+    /// Disable incremental scanning cache (force full scan)
+    #[arg(long)]
+    no_cache: bool,
 }
 
 impl ScanArgs {
@@ -146,6 +152,7 @@ impl ScanArgs {
             output: self.output.clone(),
             min_confidence,
             no_entropy: self.no_entropy,
+            no_cache: self.no_cache,
             clipboard: None,
             browser: None,
         })
@@ -208,12 +215,21 @@ fn run_scan(args: ScanArgs) -> i32 {
     };
 
     // 3. Apply CLI overrides (highest priority).
+    let no_cache = overrides.no_cache;
     config.apply_overrides(&overrides);
 
     // If a specific PATH was given, add it to extra_paths.
     if let Some(path) = &args.path {
         config.scan.extra_paths.push(path.clone());
     }
+
+    // 3b. Load incremental scanning cache.
+    let cache_file = cache::cache_path();
+    let mut scan_cache = if no_cache {
+        ScanCache::new()
+    } else {
+        ScanCache::load(&cache_file)
+    };
 
     // 4. Initialize collectors — check is_available() on each.
     let collectors: Vec<Box<dyn Collector>> = available_collectors();
@@ -244,21 +260,40 @@ fn run_scan(args: ScanArgs) -> i32 {
     let started_at = Utc::now();
 
     // 6. Run collectors — collector errors are non-fatal.
+    //    Items from cached (unchanged) files are filtered out.
     let mut all_items: Vec<ContentItem> = Vec::new();
     let mut files_scanned: usize = 0;
+    let mut files_cached: usize = 0;
 
     for collector in &collectors {
         progress(&format!("Scanning {}...", collector.name()), &config);
         match collector.collect(&config.scan) {
             Ok(items) => {
                 if !items.is_empty() {
-                    // Count unique files from this collector.
-                    let mut paths: Vec<&PathBuf> = items.iter().map(|i| &i.path).collect();
-                    paths.sort();
-                    paths.dedup();
-                    files_scanned += paths.len();
+                    // Collect unique paths from this collector.
+                    let mut unique_paths: Vec<PathBuf> =
+                        items.iter().map(|i| i.path.clone()).collect();
+                    unique_paths.sort();
+                    unique_paths.dedup();
+                    let total_paths = unique_paths.len();
+
+                    // Determine which paths are stale (need re-scanning).
+                    let stale_paths: std::collections::HashSet<PathBuf> = unique_paths
+                        .into_iter()
+                        .filter(|p| scan_cache.is_stale(p))
+                        .collect();
+
+                    let cached_count = total_paths - stale_paths.len();
+                    files_scanned += total_paths;
+                    files_cached += cached_count;
+
+                    // Only keep items from stale files.
+                    let stale_items: Vec<ContentItem> = items
+                        .into_iter()
+                        .filter(|item| stale_paths.contains(&item.path))
+                        .collect();
+                    all_items.extend(stale_items);
                 }
-                all_items.extend(items);
             }
             Err(e) => {
                 eprintln!("sks warn: {} collector error: {e}", collector.name());
@@ -295,6 +330,30 @@ fn run_scan(args: ScanArgs) -> i32 {
             .then_with(|| a.location.line.cmp(&b.location.line))
     });
 
+    // 8b. Update the incremental scanning cache.
+    if !no_cache {
+        // Count findings per path from the filtered findings list.
+        let mut findings_per_path: HashMap<&PathBuf, usize> = HashMap::new();
+        for f in &findings {
+            *findings_per_path.entry(&f.location.path).or_insert(0) += 1;
+        }
+
+        // Update cache entries for all re-scanned files.
+        for item in &all_items {
+            if !scan_cache.entries.contains_key(&item.path) {
+                if let Ok(meta) = std::fs::metadata(&item.path) {
+                    let count = findings_per_path.get(&item.path).copied().unwrap_or(0);
+                    scan_cache.update(item.path.clone(), CacheEntry::from_metadata(&meta, count));
+                }
+            }
+        }
+
+        scan_cache.prune_missing();
+        if let Err(e) = scan_cache.save(&cache_file) {
+            eprintln!("sks warn: failed to save cache: {e}");
+        }
+    }
+
     let completed_at = Utc::now();
 
     // Clear the progress line.
@@ -308,6 +367,7 @@ fn run_scan(args: ScanArgs) -> i32 {
             started_at,
             completed_at,
             files_scanned,
+            files_cached,
             bytes_scanned,
             targets_scanned,
             sks_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -409,6 +469,7 @@ mod tests {
             no_redact: false,
             min_confidence: None,
             no_entropy: false,
+            no_cache: false,
         };
         let overrides = args.to_overrides().unwrap();
         assert!(overrides.format.is_none());
@@ -418,6 +479,7 @@ mod tests {
         assert!(overrides.output.is_none());
         assert!(overrides.min_confidence.is_none());
         assert!(!overrides.no_entropy);
+        assert!(!overrides.no_cache);
     }
 
     #[test]
@@ -523,6 +585,23 @@ mod tests {
     }
 
     #[test]
+    fn scan_args_no_cache_flag() {
+        let args = ScanArgs {
+            no_cache: true,
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        assert!(overrides.no_cache);
+    }
+
+    #[test]
+    fn scan_args_default_no_cache_is_false() {
+        let args = default_scan_args();
+        let overrides = args.to_overrides().unwrap();
+        assert!(!overrides.no_cache);
+    }
+
+    #[test]
     fn exit_codes_are_distinct() {
         assert_ne!(EXIT_CLEAN, EXIT_FINDINGS);
         assert_ne!(EXIT_CLEAN, EXIT_ERROR);
@@ -539,6 +618,7 @@ mod tests {
             no_redact: false,
             min_confidence: None,
             no_entropy: false,
+            no_cache: false,
         }
     }
 }

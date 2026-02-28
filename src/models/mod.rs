@@ -244,6 +244,7 @@ pub struct ScanMetadata {
     pub started_at: DateTime<Utc>,
     pub completed_at: DateTime<Utc>,
     pub files_scanned: usize,
+    pub files_cached: usize,
     pub bytes_scanned: u64,
     pub targets_scanned: Vec<SourceType>,
     pub sks_version: String,
