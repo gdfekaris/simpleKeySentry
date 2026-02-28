@@ -142,9 +142,6 @@ fn default_dotfile_targets(home: &Path) -> Vec<PathBuf> {
         home.join(".zprofile"),
         home.join(".exports"),
         home.join(".gitconfig"),
-        home.join(".netrc"),
-        home.join(".npmrc"),
-        home.join(".pypirc"),
     ];
     #[cfg(target_os = "linux")]
     targets.push(home.join(".config/fish/config.fish"));

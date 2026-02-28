@@ -313,7 +313,7 @@ pub fn parse_structured_file(path: &Path, raw: &str, source_type: SourceType) ->
         "json" => extract_json(raw),
         "yaml" | "yml" => extract_yaml(raw),
         "toml" => extract_toml(raw),
-        "ini" | "cfg" | "conf" => extract_ini(raw),
+        "ini" | "cfg" | "conf" | "cnf" => extract_ini(raw),
         _ => return content_to_items(path, source_type, raw),
     };
 

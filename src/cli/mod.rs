@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 
+use crate::collectors::app_config::AppConfigCollector;
 use crate::collectors::cloud_cli::CloudCliCollector;
 use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
 use crate::collectors::shell_history::{
@@ -334,6 +335,7 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
         Box::new(DotfileCollector),
         Box::new(EnvFileCollector),
         Box::new(CloudCliCollector),
+        Box::new(AppConfigCollector),
         Box::new(BashHistoryCollector),
         Box::new(ZshHistoryCollector),
         Box::new(FishHistoryCollector),
