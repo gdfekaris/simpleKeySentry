@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 
+use crate::collectors::cloud_cli::CloudCliCollector;
 use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
 use crate::collectors::shell_history::{
     BashHistoryCollector, FishHistoryCollector, ZshHistoryCollector,
@@ -332,6 +333,7 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
     let candidates: Vec<Box<dyn Collector>> = vec![
         Box::new(DotfileCollector),
         Box::new(EnvFileCollector),
+        Box::new(CloudCliCollector),
         Box::new(BashHistoryCollector),
         Box::new(ZshHistoryCollector),
         Box::new(FishHistoryCollector),
