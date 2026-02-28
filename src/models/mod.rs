@@ -270,6 +270,15 @@ pub trait Collector {
 
     /// Discover and yield all content items to be scanned.
     fn collect(&self, config: &crate::config::ScanConfig) -> Result<Vec<ContentItem>, SksError>;
+
+    /// Return pre-built findings that bypass the detection engine.
+    /// Only the SSH collector overrides this (permission checks, encryption status).
+    fn direct_findings(
+        &self,
+        _config: &crate::config::ScanConfig,
+    ) -> Result<Vec<Finding>, SksError> {
+        Ok(vec![])
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
 use crate::collectors::shell_history::{
     BashHistoryCollector, FishHistoryCollector, ZshHistoryCollector,
 };
+use crate::collectors::ssh::SshCollector;
 use crate::config::{CliOverrides, ReportFormat, SksConfig};
 use crate::detection::patterns::all_patterns;
 use crate::detection::{CompiledPattern, DetectionEngine};
@@ -267,9 +268,23 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     let bytes_scanned: u64 = all_items.iter().map(|i| i.line.len() as u64).sum();
 
+    // 6b. Collect direct findings (e.g., SSH permission checks).
+    let mut direct_findings: Vec<Finding> = Vec::new();
+    for collector in &collectors {
+        match collector.direct_findings(&config.scan) {
+            Ok(df) => direct_findings.extend(df),
+            Err(e) => {
+                eprintln!("sks warn: {} direct findings error: {e}", collector.name());
+            }
+        }
+    }
+
     // 7. Run detection.
     progress("Analyzing...", &config);
     let mut findings: Vec<Finding> = engine.analyze_batch(&all_items);
+
+    // Merge direct findings so they go through the same filter/sort.
+    findings.extend(direct_findings);
 
     // 8. Filter by min_confidence and sort.
     findings.retain(|f| f.confidence >= config.detection.min_confidence);
@@ -336,6 +351,7 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
         Box::new(EnvFileCollector),
         Box::new(CloudCliCollector),
         Box::new(AppConfigCollector),
+        Box::new(SshCollector),
         Box::new(BashHistoryCollector),
         Box::new(ZshHistoryCollector),
         Box::new(FishHistoryCollector),
