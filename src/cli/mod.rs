@@ -74,6 +74,8 @@ struct Cli {
 enum Command {
     /// Scan for secrets in local files and history
     Scan(ScanArgs),
+    /// Re-render a saved JSON scan report in another format
+    Report(ReportArgs),
     /// Create a default config file
     Init {
         /// Overwrite existing config file
@@ -119,6 +121,33 @@ struct ScanArgs {
     /// Disable incremental scanning cache (force full scan)
     #[arg(long)]
     no_cache: bool,
+}
+
+#[derive(Parser, Clone)]
+struct ReportArgs {
+    /// Path to a JSON scan report file
+    #[arg(value_name = "PATH")]
+    path: PathBuf,
+
+    /// Output format [terminal|html|json]
+    #[arg(short, long, value_name = "FORMAT")]
+    format: Option<String>,
+
+    /// Write report to file
+    #[arg(short, long, value_name = "PATH")]
+    output: Option<PathBuf>,
+
+    /// Show full secret values (dangerous!)
+    #[arg(long)]
+    no_redact: bool,
+
+    /// Show low/info findings
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Show only summary
+    #[arg(short, long)]
+    quiet: bool,
 }
 
 impl ScanArgs {
@@ -172,6 +201,7 @@ pub fn run() -> i32 {
     match cli.command {
         Some(Command::Init { force }) => run_init(force),
         Some(Command::Scan(args)) => run_scan(args),
+        Some(Command::Report(args)) => run_report(args),
         None => run_scan(cli.scan_args),
     }
 }
@@ -190,6 +220,81 @@ fn run_init(force: bool) -> i32 {
             eprintln!("sks error: {e}");
             EXIT_ERROR
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Report command
+// ---------------------------------------------------------------------------
+
+fn run_report(args: ReportArgs) -> i32 {
+    // 1. Read the JSON file.
+    let json_content = match std::fs::read_to_string(&args.path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("sks error: cannot read {}: {e}", args.path.display());
+            return EXIT_ERROR;
+        }
+    };
+
+    // 2. Parse JSON into ScanResult.
+    let result = match crate::reporting::json::parse_json_report(&json_content) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("sks error: {e}");
+            return EXIT_ERROR;
+        }
+    };
+
+    // 3. Build report config from flags.
+    let format = match &args.format {
+        Some(f) => match f.to_lowercase().as_str() {
+            "terminal" => ReportFormat::Terminal,
+            "json" => ReportFormat::Json,
+            "html" => ReportFormat::Html,
+            other => {
+                eprintln!("sks error: Unknown format '{other}': expected terminal, json, or html");
+                return EXIT_ERROR;
+            }
+        },
+        None => ReportFormat::Terminal,
+    };
+
+    let verbosity = if args.quiet {
+        crate::config::Verbosity::Quiet
+    } else if args.verbose {
+        crate::config::Verbosity::Verbose
+    } else {
+        crate::config::Verbosity::Normal
+    };
+
+    let report_config = crate::config::ReportConfig {
+        format: format.clone(),
+        verbosity,
+        redact: !args.no_redact,
+        output_path: args.output,
+    };
+
+    // 4. Invoke reporter.
+    let reporter: Box<dyn crate::models::Reporter> = match format {
+        ReportFormat::Terminal => Box::new(TerminalReporter),
+        ReportFormat::Json => Box::new(JsonReporter),
+        ReportFormat::Html => Box::new(HtmlReporter),
+        _ => {
+            eprintln!("sks error: format '{format:?}' is not supported for report");
+            return EXIT_ERROR;
+        }
+    };
+
+    if let Err(e) = reporter.report(&result, &report_config) {
+        eprintln!("sks error: {e}");
+        return EXIT_ERROR;
+    }
+
+    if result.findings.is_empty() {
+        EXIT_CLEAN
+    } else {
+        EXIT_FINDINGS
     }
 }
 
@@ -633,5 +738,176 @@ mod tests {
             no_entropy: false,
             no_cache: false,
         }
+    }
+
+    #[test]
+    fn report_reads_json_and_rerenders() {
+        use crate::models::*;
+        use crate::reporting::json::format_json;
+
+        let now = chrono::Utc::now();
+        let finding = Finding::new(
+            SecretType::AwsAccessKey,
+            0.95,
+            SecretValue::new("AKIAIOSFODNN7EXAMPLE".to_string()),
+            SourceLocation {
+                path: PathBuf::from("/home/user/.env"),
+                line: Some(5),
+                column: None,
+                context_before: String::new(),
+                context_after: String::new(),
+                source_type: SourceType::EnvFile,
+            },
+            "AWS key".to_string(),
+            "Rotate".to_string(),
+            Some("aws-access-key-id".to_string()),
+        );
+        let result = ScanResult {
+            findings: vec![finding],
+            scan_metadata: ScanMetadata {
+                started_at: now,
+                completed_at: now,
+                files_scanned: 10,
+                files_cached: 2,
+                bytes_scanned: 4096,
+                targets_scanned: vec![SourceType::EnvFile],
+                sks_version: "0.1.0".to_string(),
+            },
+        };
+
+        let config = crate::config::ReportConfig {
+            format: ReportFormat::Json,
+            verbosity: crate::config::Verbosity::Normal,
+            redact: false,
+            output_path: None,
+        };
+
+        // Write JSON to a temp file.
+        let dir = std::env::temp_dir().join("sks_test_report_cmd");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let json_path = dir.join("scan.json");
+        let json_str = format_json(&result, &config).unwrap();
+        std::fs::write(&json_path, &json_str).unwrap();
+
+        // Use run_report to re-render as JSON to a file.
+        let out_path = dir.join("out.json");
+        let args = ReportArgs {
+            path: json_path,
+            format: Some("json".to_string()),
+            output: Some(out_path.clone()),
+            no_redact: true,
+            verbose: false,
+            quiet: false,
+        };
+        let code = run_report(args);
+        assert_eq!(code, EXIT_FINDINGS);
+
+        let output = std::fs::read_to_string(&out_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["findings"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["scan"]["files_scanned"], 10);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn report_missing_file_returns_error() {
+        let args = ReportArgs {
+            path: PathBuf::from("/tmp/nonexistent_sks_report.json"),
+            format: None,
+            output: None,
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_ERROR);
+    }
+
+    #[test]
+    fn report_invalid_json_returns_error() {
+        let dir = std::env::temp_dir().join("sks_test_report_invalid");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bad.json");
+        std::fs::write(&path, "not valid json").unwrap();
+
+        let args = ReportArgs {
+            path,
+            format: None,
+            output: None,
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_ERROR);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn report_invalid_format_returns_error() {
+        let dir = std::env::temp_dir().join("sks_test_report_badfmt");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("empty.json");
+        std::fs::write(&path, "{}").unwrap();
+
+        let args = ReportArgs {
+            path,
+            format: Some("xml".to_string()),
+            output: None,
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_ERROR);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn report_no_findings_returns_clean() {
+        use crate::models::*;
+        use crate::reporting::json::format_json;
+
+        let now = chrono::Utc::now();
+        let result = ScanResult {
+            findings: vec![],
+            scan_metadata: ScanMetadata {
+                started_at: now,
+                completed_at: now,
+                files_scanned: 5,
+                files_cached: 0,
+                bytes_scanned: 1024,
+                targets_scanned: vec![],
+                sks_version: "0.1.0".to_string(),
+            },
+        };
+        let config = crate::config::ReportConfig {
+            format: ReportFormat::Json,
+            verbosity: crate::config::Verbosity::Normal,
+            redact: true,
+            output_path: None,
+        };
+
+        let dir = std::env::temp_dir().join("sks_test_report_clean");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("clean.json");
+        std::fs::write(&path, format_json(&result, &config).unwrap()).unwrap();
+
+        let out_path = dir.join("out.json");
+        let args = ReportArgs {
+            path,
+            format: Some("json".to_string()),
+            output: Some(out_path),
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_CLEAN);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
