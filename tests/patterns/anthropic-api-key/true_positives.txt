@@ -1,0 +1,6 @@
+# Anthropic API keys
+sk-ant-abcdefghijklmnopqrst
+sk-ant-ABCDEFGHIJKLMNOPQRSTUVWXYZ
+sk-ant-abc_def-ghi_jkl_mnop1234
+ANTHROPIC_API_KEY=sk-ant-xyzABCDEFGHIJKLMNOPQRS
+export ANTHROPIC_KEY=sk-ant-12345678901234567890

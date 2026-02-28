@@ -1,0 +1,6 @@
+# Datadog API keys (32 hex chars)
+datadog_api_key=aabbccdd00112233445566778899aabb
+DD_API_KEY: 00112233445566778899aabbccddeeff
+datadog-apikey = abcdef0123456789abcdef0123456789
+dd_key=fedcba9876543210fedcba9876543210
+DATADOG_KEY: "0123456789abcdef0123456789abcdef"

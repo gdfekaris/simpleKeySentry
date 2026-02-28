@@ -1,0 +1,6 @@
+# Not Azure client secrets
+client_secret = "short"
+AZURE_TENANT_ID=abc12345-def6-7890-abcd-ef1234567890
+azure_subscription_id = "12345678-1234-1234-1234-123456789012"
+client_id: "abcdef12-3456-7890-abcd-ef1234567890"
+random text with no azure secret

@@ -1,0 +1,6 @@
+# Not Azure SAS tokens
+?sv=2020-08-04&ss=bfqt
+sig=tooshort
+?signature=abcdef1234567890
+&token=abc123
+?sv=2020-08-04&se=2023-01-01

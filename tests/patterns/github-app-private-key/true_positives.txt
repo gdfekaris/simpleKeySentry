@@ -1,0 +1,6 @@
+# GitHub App private keys
+github_app_key = "-----BEGIN RSA PRIVATE KEY-----"
+github-app-private-key: -----BEGIN PRIVATE KEY-----
+GITHUB_APP_PEM="-----BEGIN RSA PRIVATE KEY-----"
+github app key file contains -----BEGIN EC PRIVATE KEY-----
+GitHub_App_Secret_Key="-----BEGIN PRIVATE KEY-----"

@@ -1,0 +1,6 @@
+# Mailgun API keys
+mailgun_api_key=key-0123456789abcdef0123456789abcdef
+MAILGUN_KEY: key-aabbccdd00112233445566778899aabb
+mg_api_key = key-abcdef0123456789abcdef0123456789
+MG_KEY=key-00112233445566778899aabbccddeeff
+mailgun-apikey: key-fedcba9876543210fedcba9876543210

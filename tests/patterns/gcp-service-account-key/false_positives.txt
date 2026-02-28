@@ -1,0 +1,6 @@
+# Not GCP service account keys
+"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAB"
+"type": "service_account"
+private_key_id is a field name
+"project_id": "my-project-123456"
+some random text with no key

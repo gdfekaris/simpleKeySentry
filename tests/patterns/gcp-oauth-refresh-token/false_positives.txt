@@ -1,0 +1,6 @@
+# Not GCP OAuth refresh tokens
+"refresh_token": "short"
+client_secret = "not-a-gcp-token"
+"access_token": "ya29.something"
+refresh_token = "2//not-matching-prefix"
+"client_id": "123456789.apps.googleusercontent.com"

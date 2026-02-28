@@ -1,0 +1,6 @@
+# Not Datadog API keys
+datadog_app_key=aabbccddee
+DD_SITE: datadoghq.com
+api_key=aabbccdd00112233445566778899aabb
+datadog_api_key=tooshort
+datadog_api_key=aabbccdd001122334455667788

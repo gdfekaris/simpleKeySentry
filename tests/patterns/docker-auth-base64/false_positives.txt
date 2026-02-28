@@ -1,0 +1,6 @@
+# Not Docker auth
+"auth": "short"
+"username": "dXNlcm5hbWU="
+auth = "dXNlcm5hbWU6cGFzc3dvcmQ="
+"auth": ""
+"identitytoken": "some-token"

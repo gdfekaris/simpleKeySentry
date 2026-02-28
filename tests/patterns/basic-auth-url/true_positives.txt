@@ -1,0 +1,6 @@
+# URLs with embedded basic-auth credentials
+https://admin:supersecret@example.com
+http://user:p4ssw0rd@api.example.com
+https://deploy:token123@registry.example.com
+https://admin:MyP@ssword@internal.corp.example.com
+http://root:secretpass@10.0.0.1

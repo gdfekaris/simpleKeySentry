@@ -1,0 +1,6 @@
+# GitLab pipeline trigger tokens
+glptt-abcdefghij1234567890
+glptt-ABCDEFGHIJKLMNOPQRSTUVWX
+glptt-abc_def-ghi_jkl_mnop1234
+CI_TRIGGER=glptt-xyzABCDEFGHIJKLMNOPQRS
+export TRIGGER_TOKEN=glptt-12345678901234567890

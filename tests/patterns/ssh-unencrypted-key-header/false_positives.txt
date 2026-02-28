@@ -1,0 +1,6 @@
+# Not unencrypted SSH private key headers
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+-----BEGIN PUBLIC KEY-----
+-----BEGIN CERTIFICATE-----
+-----BEGIN RSA PUBLIC KEY-----
+-----END RSA PRIVATE KEY-----

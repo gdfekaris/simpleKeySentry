@@ -1,0 +1,6 @@
+# Docker registry auth (base64 in JSON)
+"auth": "dXNlcm5hbWU6cGFzc3dvcmQ="
+"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="
+"auth" : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn"
+"Auth": "dXNlcm5hbWU6cGFzc3dvcmQ="
+"AUTH" : "ABCDEFGHIJKLMNOPQRST"

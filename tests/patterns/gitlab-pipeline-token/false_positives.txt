@@ -1,0 +1,6 @@
+# Not GitLab pipeline tokens
+glptt-short
+glpat-abcdefghij1234567890
+glptt_invalid_prefix_token
+pipeline-trigger-token
+random text not matching
