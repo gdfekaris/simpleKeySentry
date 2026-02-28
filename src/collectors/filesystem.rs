@@ -112,7 +112,11 @@ pub(crate) fn truncate_line(s: &str) -> String {
 }
 
 /// Converts file text into [`ContentItem`]s with a ±2-line context window.
-fn content_to_items(path: &Path, source_type: SourceType, text: &str) -> Vec<ContentItem> {
+pub(crate) fn content_to_items(
+    path: &Path,
+    source_type: SourceType,
+    text: &str,
+) -> Vec<ContentItem> {
     let lines: Vec<String> = text.lines().map(truncate_line).collect();
     let n = lines.len();
     lines
@@ -129,22 +133,17 @@ fn content_to_items(path: &Path, source_type: SourceType, text: &str) -> Vec<Con
         .collect()
 }
 
-/// Core file-reading logic shared by both collectors.
+/// Reads a file as raw text after safety checks.
 ///
 /// Returns:
-/// - `Ok(Some(items))` — file was read successfully.
+/// - `Ok(Some(text))` — file was read successfully.
 /// - `Ok(None)` — file should be silently skipped (missing, binary, oversized,
 ///   permission denied, or unreadable).
 /// - `Err(_)` — unexpected I/O error that should propagate.
-fn try_read_file(
-    path: &Path,
-    source_type: SourceType,
-    max_file_size: u64,
-) -> Result<Option<Vec<ContentItem>>, SksError> {
+pub(crate) fn try_read_raw(path: &Path, max_file_size: u64) -> Result<Option<String>, SksError> {
     let meta = match fs::metadata(path) {
         Ok(m) => m,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // Missing files are skipped silently (not an error).
             return Ok(None);
         }
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
@@ -175,7 +174,7 @@ fn try_read_file(
     }
 
     match read_content(path) {
-        Ok(text) => Ok(Some(content_to_items(path, source_type, &text))),
+        Ok(text) => Ok(Some(text)),
         Err(e) => {
             eprintln!(
                 "sks warn: could not read '{}': {}; skipping",
@@ -184,6 +183,24 @@ fn try_read_file(
             );
             Ok(None)
         }
+    }
+}
+
+/// Core file-reading logic shared by both collectors.
+///
+/// Returns:
+/// - `Ok(Some(items))` — file was read successfully.
+/// - `Ok(None)` — file should be silently skipped (missing, binary, oversized,
+///   permission denied, or unreadable).
+/// - `Err(_)` — unexpected I/O error that should propagate.
+fn try_read_file(
+    path: &Path,
+    source_type: SourceType,
+    max_file_size: u64,
+) -> Result<Option<Vec<ContentItem>>, SksError> {
+    match try_read_raw(path, max_file_size)? {
+        Some(text) => Ok(Some(content_to_items(path, source_type, &text))),
+        None => Ok(None),
     }
 }
 

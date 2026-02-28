@@ -1,0 +1,6 @@
+# Not basic-auth URLs
+https://example.com
+http://user@example.com
+https://admin:ab@example.com
+ftp://user:password@files.example.com
+postgres://user:password@db.example.com

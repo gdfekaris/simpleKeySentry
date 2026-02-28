@@ -1,0 +1,6 @@
+# Not Anthropic API keys
+sk-ant-short
+sk-proj-abcdefghijklmnopqrst
+sk_ant_abcdefghijklmnopqrst
+anthropic_key=something_else
+sk-antx-abcdefghijklmnopqrst

@@ -1,0 +1,6 @@
+# Not Bitbucket app passwords
+ATBBshort
+ATBC0123456789ABCDEF0123456789abcdef
+atbb0123456789abcdef0123456789abcdef
+ATBBabcdefghijklmnopqrstuvwxyz12345
+bitbucket_token=something_else

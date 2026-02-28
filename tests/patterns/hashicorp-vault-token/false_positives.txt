@@ -1,0 +1,6 @@
+# Not HashiCorp Vault tokens
+hvs.short
+hvs-abcdefghijklmnopqrstuvwx
+vault_token=something_else
+hvs_abcdefghijklmnopqrstuvwx
+random text not matching

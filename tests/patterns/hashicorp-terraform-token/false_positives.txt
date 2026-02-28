@@ -1,0 +1,6 @@
+# Not HashiCorp Terraform Cloud tokens
+short.atlasv1.abcdef
+abcdefghijklmn.atlasv2.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567
+terraform-token-something
+abcdefghijklmn.atlasv1.short
+random text not matching

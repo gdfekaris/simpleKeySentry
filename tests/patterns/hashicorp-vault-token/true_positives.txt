@@ -1,0 +1,6 @@
+# HashiCorp Vault tokens
+hvs.abcdefghijklmnopqrstuvwx
+hvs.ABCDEFGHIJKLMNOPQRSTUVWXYZ
+hvs.abc_def-ghi_jkl_mnop12345678
+VAULT_TOKEN=hvs.xyzABCDEFGHIJKLMNOPQRSTUV
+export VAULT_TOKEN=hvs.123456789012345678901234

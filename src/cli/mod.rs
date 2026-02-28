@@ -13,22 +13,28 @@
 //! | 1    | Findings found above threshold |
 //! | 2    | Scan error (config parse failure, etc.) |
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 
+use crate::cache::{self, CacheEntry, ScanCache};
+use crate::collectors::app_config::AppConfigCollector;
+use crate::collectors::cloud_cli::CloudCliCollector;
 use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
 use crate::collectors::shell_history::{
     BashHistoryCollector, FishHistoryCollector, ZshHistoryCollector,
 };
+use crate::collectors::ssh::SshCollector;
 use crate::config::{CliOverrides, ReportFormat, SksConfig};
 use crate::detection::patterns::all_patterns;
 use crate::detection::{CompiledPattern, DetectionEngine};
 use crate::models::{
     Collector, ContentItem, Finding, Reporter, ScanMetadata, ScanResult, SourceType,
 };
+use crate::reporting::html::HtmlReporter;
 use crate::reporting::json::JsonReporter;
 use crate::reporting::terminal::TerminalReporter;
 
@@ -68,6 +74,8 @@ struct Cli {
 enum Command {
     /// Scan for secrets in local files and history
     Scan(ScanArgs),
+    /// Re-render a saved JSON scan report in another format
+    Report(ReportArgs),
     /// Create a default config file
     Init {
         /// Overwrite existing config file
@@ -82,7 +90,7 @@ struct ScanArgs {
     #[arg(value_name = "PATH")]
     path: Option<PathBuf>,
 
-    /// Output format [terminal|json]
+    /// Output format [terminal|json|html]
     #[arg(short, long, value_name = "FORMAT")]
     format: Option<String>,
 
@@ -109,6 +117,37 @@ struct ScanArgs {
     /// Disable entropy analysis
     #[arg(long)]
     no_entropy: bool,
+
+    /// Disable incremental scanning cache (force full scan)
+    #[arg(long)]
+    no_cache: bool,
+}
+
+#[derive(Parser, Clone)]
+struct ReportArgs {
+    /// Path to a JSON scan report file
+    #[arg(value_name = "PATH")]
+    path: PathBuf,
+
+    /// Output format [terminal|html|json]
+    #[arg(short, long, value_name = "FORMAT")]
+    format: Option<String>,
+
+    /// Write report to file
+    #[arg(short, long, value_name = "PATH")]
+    output: Option<PathBuf>,
+
+    /// Show full secret values (dangerous!)
+    #[arg(long)]
+    no_redact: bool,
+
+    /// Show low/info findings
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Show only summary
+    #[arg(short, long)]
+    quiet: bool,
 }
 
 impl ScanArgs {
@@ -119,9 +158,10 @@ impl ScanArgs {
                 let fmt = match f.to_lowercase().as_str() {
                     "terminal" => ReportFormat::Terminal,
                     "json" => ReportFormat::Json,
+                    "html" => ReportFormat::Html,
                     other => {
                         return Err(format!(
-                            "Unknown format '{other}': expected terminal or json"
+                            "Unknown format '{other}': expected terminal, json, or html"
                         ))
                     }
                 };
@@ -143,6 +183,7 @@ impl ScanArgs {
             output: self.output.clone(),
             min_confidence,
             no_entropy: self.no_entropy,
+            no_cache: self.no_cache,
             clipboard: None,
             browser: None,
         })
@@ -160,6 +201,7 @@ pub fn run() -> i32 {
     match cli.command {
         Some(Command::Init { force }) => run_init(force),
         Some(Command::Scan(args)) => run_scan(args),
+        Some(Command::Report(args)) => run_report(args),
         None => run_scan(cli.scan_args),
     }
 }
@@ -178,6 +220,81 @@ fn run_init(force: bool) -> i32 {
             eprintln!("sks error: {e}");
             EXIT_ERROR
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Report command
+// ---------------------------------------------------------------------------
+
+fn run_report(args: ReportArgs) -> i32 {
+    // 1. Read the JSON file.
+    let json_content = match std::fs::read_to_string(&args.path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("sks error: cannot read {}: {e}", args.path.display());
+            return EXIT_ERROR;
+        }
+    };
+
+    // 2. Parse JSON into ScanResult.
+    let result = match crate::reporting::json::parse_json_report(&json_content) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("sks error: {e}");
+            return EXIT_ERROR;
+        }
+    };
+
+    // 3. Build report config from flags.
+    let format = match &args.format {
+        Some(f) => match f.to_lowercase().as_str() {
+            "terminal" => ReportFormat::Terminal,
+            "json" => ReportFormat::Json,
+            "html" => ReportFormat::Html,
+            other => {
+                eprintln!("sks error: Unknown format '{other}': expected terminal, json, or html");
+                return EXIT_ERROR;
+            }
+        },
+        None => ReportFormat::Terminal,
+    };
+
+    let verbosity = if args.quiet {
+        crate::config::Verbosity::Quiet
+    } else if args.verbose {
+        crate::config::Verbosity::Verbose
+    } else {
+        crate::config::Verbosity::Normal
+    };
+
+    let report_config = crate::config::ReportConfig {
+        format: format.clone(),
+        verbosity,
+        redact: !args.no_redact,
+        output_path: args.output,
+    };
+
+    // 4. Invoke reporter.
+    let reporter: Box<dyn crate::models::Reporter> = match format {
+        ReportFormat::Terminal => Box::new(TerminalReporter),
+        ReportFormat::Json => Box::new(JsonReporter),
+        ReportFormat::Html => Box::new(HtmlReporter),
+        _ => {
+            eprintln!("sks error: format '{format:?}' is not supported for report");
+            return EXIT_ERROR;
+        }
+    };
+
+    if let Err(e) = reporter.report(&result, &report_config) {
+        eprintln!("sks error: {e}");
+        return EXIT_ERROR;
+    }
+
+    if result.findings.is_empty() {
+        EXIT_CLEAN
+    } else {
+        EXIT_FINDINGS
     }
 }
 
@@ -205,12 +322,21 @@ fn run_scan(args: ScanArgs) -> i32 {
     };
 
     // 3. Apply CLI overrides (highest priority).
+    let no_cache = overrides.no_cache;
     config.apply_overrides(&overrides);
 
     // If a specific PATH was given, add it to extra_paths.
     if let Some(path) = &args.path {
         config.scan.extra_paths.push(path.clone());
     }
+
+    // 3b. Load incremental scanning cache.
+    let cache_file = cache::cache_path();
+    let mut scan_cache = if no_cache {
+        ScanCache::new()
+    } else {
+        ScanCache::load(&cache_file)
+    };
 
     // 4. Initialize collectors — check is_available() on each.
     let collectors: Vec<Box<dyn Collector>> = available_collectors();
@@ -241,21 +367,40 @@ fn run_scan(args: ScanArgs) -> i32 {
     let started_at = Utc::now();
 
     // 6. Run collectors — collector errors are non-fatal.
+    //    Items from cached (unchanged) files are filtered out.
     let mut all_items: Vec<ContentItem> = Vec::new();
     let mut files_scanned: usize = 0;
+    let mut files_cached: usize = 0;
 
     for collector in &collectors {
         progress(&format!("Scanning {}...", collector.name()), &config);
         match collector.collect(&config.scan) {
             Ok(items) => {
                 if !items.is_empty() {
-                    // Count unique files from this collector.
-                    let mut paths: Vec<&PathBuf> = items.iter().map(|i| &i.path).collect();
-                    paths.sort();
-                    paths.dedup();
-                    files_scanned += paths.len();
+                    // Collect unique paths from this collector.
+                    let mut unique_paths: Vec<PathBuf> =
+                        items.iter().map(|i| i.path.clone()).collect();
+                    unique_paths.sort();
+                    unique_paths.dedup();
+                    let total_paths = unique_paths.len();
+
+                    // Determine which paths are stale (need re-scanning).
+                    let stale_paths: std::collections::HashSet<PathBuf> = unique_paths
+                        .into_iter()
+                        .filter(|p| scan_cache.is_stale(p))
+                        .collect();
+
+                    let cached_count = total_paths - stale_paths.len();
+                    files_scanned += total_paths;
+                    files_cached += cached_count;
+
+                    // Only keep items from stale files.
+                    let stale_items: Vec<ContentItem> = items
+                        .into_iter()
+                        .filter(|item| stale_paths.contains(&item.path))
+                        .collect();
+                    all_items.extend(stale_items);
                 }
-                all_items.extend(items);
             }
             Err(e) => {
                 eprintln!("sks warn: {} collector error: {e}", collector.name());
@@ -265,9 +410,23 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     let bytes_scanned: u64 = all_items.iter().map(|i| i.line.len() as u64).sum();
 
+    // 6b. Collect direct findings (e.g., SSH permission checks).
+    let mut direct_findings: Vec<Finding> = Vec::new();
+    for collector in &collectors {
+        match collector.direct_findings(&config.scan) {
+            Ok(df) => direct_findings.extend(df),
+            Err(e) => {
+                eprintln!("sks warn: {} direct findings error: {e}", collector.name());
+            }
+        }
+    }
+
     // 7. Run detection.
     progress("Analyzing...", &config);
     let mut findings: Vec<Finding> = engine.analyze_batch(&all_items);
+
+    // Merge direct findings so they go through the same filter/sort.
+    findings.extend(direct_findings);
 
     // 8. Filter by min_confidence and sort.
     findings.retain(|f| f.confidence >= config.detection.min_confidence);
@@ -277,6 +436,30 @@ fn run_scan(args: ScanArgs) -> i32 {
             .then_with(|| a.location.path.cmp(&b.location.path))
             .then_with(|| a.location.line.cmp(&b.location.line))
     });
+
+    // 8b. Update the incremental scanning cache.
+    if !no_cache {
+        // Count findings per path from the filtered findings list.
+        let mut findings_per_path: HashMap<&PathBuf, usize> = HashMap::new();
+        for f in &findings {
+            *findings_per_path.entry(&f.location.path).or_insert(0) += 1;
+        }
+
+        // Update cache entries for all re-scanned files.
+        for item in &all_items {
+            if !scan_cache.entries.contains_key(&item.path) {
+                if let Ok(meta) = std::fs::metadata(&item.path) {
+                    let count = findings_per_path.get(&item.path).copied().unwrap_or(0);
+                    scan_cache.update(item.path.clone(), CacheEntry::from_metadata(&meta, count));
+                }
+            }
+        }
+
+        scan_cache.prune_missing();
+        if let Err(e) = scan_cache.save(&cache_file) {
+            eprintln!("sks warn: failed to save cache: {e}");
+        }
+    }
 
     let completed_at = Utc::now();
 
@@ -291,6 +474,7 @@ fn run_scan(args: ScanArgs) -> i32 {
             started_at,
             completed_at,
             files_scanned,
+            files_cached,
             bytes_scanned,
             targets_scanned,
             sks_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -301,6 +485,7 @@ fn run_scan(args: ScanArgs) -> i32 {
     let reporter: Box<dyn Reporter> = match config.report.format {
         ReportFormat::Terminal => Box::new(TerminalReporter),
         ReportFormat::Json => Box::new(JsonReporter),
+        ReportFormat::Html => Box::new(HtmlReporter),
         _ => {
             eprintln!(
                 "sks error: format '{:?}' is not yet supported; using terminal",
@@ -332,6 +517,9 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
     let candidates: Vec<Box<dyn Collector>> = vec![
         Box::new(DotfileCollector),
         Box::new(EnvFileCollector),
+        Box::new(CloudCliCollector),
+        Box::new(AppConfigCollector),
+        Box::new(SshCollector),
         Box::new(BashHistoryCollector),
         Box::new(ZshHistoryCollector),
         Box::new(FishHistoryCollector),
@@ -389,6 +577,7 @@ mod tests {
             no_redact: false,
             min_confidence: None,
             no_entropy: false,
+            no_cache: false,
         };
         let overrides = args.to_overrides().unwrap();
         assert!(overrides.format.is_none());
@@ -398,6 +587,7 @@ mod tests {
         assert!(overrides.output.is_none());
         assert!(overrides.min_confidence.is_none());
         assert!(!overrides.no_entropy);
+        assert!(!overrides.no_cache);
     }
 
     #[test]
@@ -418,6 +608,16 @@ mod tests {
         };
         let overrides = args.to_overrides().unwrap();
         assert_eq!(overrides.format, Some(ReportFormat::Terminal));
+    }
+
+    #[test]
+    fn scan_args_format_html() {
+        let args = ScanArgs {
+            format: Some("html".to_string()),
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        assert_eq!(overrides.format, Some(ReportFormat::Html));
     }
 
     #[test]
@@ -503,6 +703,23 @@ mod tests {
     }
 
     #[test]
+    fn scan_args_no_cache_flag() {
+        let args = ScanArgs {
+            no_cache: true,
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        assert!(overrides.no_cache);
+    }
+
+    #[test]
+    fn scan_args_default_no_cache_is_false() {
+        let args = default_scan_args();
+        let overrides = args.to_overrides().unwrap();
+        assert!(!overrides.no_cache);
+    }
+
+    #[test]
     fn exit_codes_are_distinct() {
         assert_ne!(EXIT_CLEAN, EXIT_FINDINGS);
         assert_ne!(EXIT_CLEAN, EXIT_ERROR);
@@ -519,6 +736,178 @@ mod tests {
             no_redact: false,
             min_confidence: None,
             no_entropy: false,
+            no_cache: false,
         }
+    }
+
+    #[test]
+    fn report_reads_json_and_rerenders() {
+        use crate::models::*;
+        use crate::reporting::json::format_json;
+
+        let now = chrono::Utc::now();
+        let finding = Finding::new(
+            SecretType::AwsAccessKey,
+            0.95,
+            SecretValue::new("AKIAIOSFODNN7EXAMPLE".to_string()),
+            SourceLocation {
+                path: PathBuf::from("/home/user/.env"),
+                line: Some(5),
+                column: None,
+                context_before: String::new(),
+                context_after: String::new(),
+                source_type: SourceType::EnvFile,
+            },
+            "AWS key".to_string(),
+            "Rotate".to_string(),
+            Some("aws-access-key-id".to_string()),
+        );
+        let result = ScanResult {
+            findings: vec![finding],
+            scan_metadata: ScanMetadata {
+                started_at: now,
+                completed_at: now,
+                files_scanned: 10,
+                files_cached: 2,
+                bytes_scanned: 4096,
+                targets_scanned: vec![SourceType::EnvFile],
+                sks_version: "0.1.0".to_string(),
+            },
+        };
+
+        let config = crate::config::ReportConfig {
+            format: ReportFormat::Json,
+            verbosity: crate::config::Verbosity::Normal,
+            redact: false,
+            output_path: None,
+        };
+
+        // Write JSON to a temp file.
+        let dir = std::env::temp_dir().join("sks_test_report_cmd");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let json_path = dir.join("scan.json");
+        let json_str = format_json(&result, &config).unwrap();
+        std::fs::write(&json_path, &json_str).unwrap();
+
+        // Use run_report to re-render as JSON to a file.
+        let out_path = dir.join("out.json");
+        let args = ReportArgs {
+            path: json_path,
+            format: Some("json".to_string()),
+            output: Some(out_path.clone()),
+            no_redact: true,
+            verbose: false,
+            quiet: false,
+        };
+        let code = run_report(args);
+        assert_eq!(code, EXIT_FINDINGS);
+
+        let output = std::fs::read_to_string(&out_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["findings"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["scan"]["files_scanned"], 10);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn report_missing_file_returns_error() {
+        let args = ReportArgs {
+            path: PathBuf::from("/tmp/nonexistent_sks_report.json"),
+            format: None,
+            output: None,
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_ERROR);
+    }
+
+    #[test]
+    fn report_invalid_json_returns_error() {
+        let dir = std::env::temp_dir().join("sks_test_report_invalid");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bad.json");
+        std::fs::write(&path, "not valid json").unwrap();
+
+        let args = ReportArgs {
+            path,
+            format: None,
+            output: None,
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_ERROR);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn report_invalid_format_returns_error() {
+        let dir = std::env::temp_dir().join("sks_test_report_badfmt");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("empty.json");
+        std::fs::write(&path, "{}").unwrap();
+
+        let args = ReportArgs {
+            path,
+            format: Some("xml".to_string()),
+            output: None,
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_ERROR);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn report_no_findings_returns_clean() {
+        use crate::models::*;
+        use crate::reporting::json::format_json;
+
+        let now = chrono::Utc::now();
+        let result = ScanResult {
+            findings: vec![],
+            scan_metadata: ScanMetadata {
+                started_at: now,
+                completed_at: now,
+                files_scanned: 5,
+                files_cached: 0,
+                bytes_scanned: 1024,
+                targets_scanned: vec![],
+                sks_version: "0.1.0".to_string(),
+            },
+        };
+        let config = crate::config::ReportConfig {
+            format: ReportFormat::Json,
+            verbosity: crate::config::Verbosity::Normal,
+            redact: true,
+            output_path: None,
+        };
+
+        let dir = std::env::temp_dir().join("sks_test_report_clean");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("clean.json");
+        std::fs::write(&path, format_json(&result, &config).unwrap()).unwrap();
+
+        let out_path = dir.join("out.json");
+        let args = ReportArgs {
+            path,
+            format: Some("json".to_string()),
+            output: Some(out_path),
+            no_redact: false,
+            verbose: false,
+            quiet: false,
+        };
+        assert_eq!(run_report(args), EXIT_CLEAN);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

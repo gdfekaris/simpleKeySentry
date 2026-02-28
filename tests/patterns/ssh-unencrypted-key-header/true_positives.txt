@@ -1,0 +1,7 @@
+# SSH unencrypted private key headers
+-----BEGIN RSA PRIVATE KEY-----
+-----BEGIN EC PRIVATE KEY-----
+-----BEGIN DSA PRIVATE KEY-----
+-----BEGIN OPENSSH PRIVATE KEY-----
+-----BEGIN ED25519 PRIVATE KEY-----
+-----BEGIN PRIVATE KEY-----

@@ -86,6 +86,7 @@ pub struct CliOverrides {
     pub output: Option<PathBuf>,
     pub min_confidence: Option<f64>, // 0.0–1.0
     pub no_entropy: bool,
+    pub no_cache: bool,
     pub clipboard: Option<bool>,
     pub browser: Option<bool>,
 }
@@ -142,9 +143,6 @@ fn default_dotfile_targets(home: &Path) -> Vec<PathBuf> {
         home.join(".zprofile"),
         home.join(".exports"),
         home.join(".gitconfig"),
-        home.join(".netrc"),
-        home.join(".npmrc"),
-        home.join(".pypirc"),
     ];
     #[cfg(target_os = "linux")]
     targets.push(home.join(".config/fish/config.fish"));

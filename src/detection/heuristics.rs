@@ -107,7 +107,7 @@ impl Heuristic for FilePathSignal {
         static RE: OnceLock<Regex> = OnceLock::new();
         let re = RE.get_or_init(|| {
             build_regex(
-                r"(?i)^(?:\.env(?:\..+)?|credentials?|secrets?|\.netrc|config\.json|settings\.(?:py|ya?ml)|\.npmrc|\.pypirc|terraform\.tfvars|vault\.ya?ml)$",
+                r"(?i)^(?:\.env(?:\..+)?|credentials?(?:\.toml)?|secrets?|\.netrc|config\.json|settings\.(?:py|ya?ml)|\.npmrc|\.pypirc|\.pgpass|\.my\.cnf|terraform\.tfvars|vault\.ya?ml)$",
             )
         });
 
@@ -408,6 +408,27 @@ mod tests {
             h.evaluate(&ctx("val", "let x = val;", &[], &[], &script_path())),
             0.0
         );
+    }
+
+    #[test]
+    fn fps_fires_on_pgpass() {
+        let h = FilePathSignal;
+        let path = PathBuf::from("/home/user/.pgpass");
+        assert_eq!(h.evaluate(&ctx("val", "KEY=val", &[], &[], &path)), 0.10);
+    }
+
+    #[test]
+    fn fps_fires_on_my_cnf() {
+        let h = FilePathSignal;
+        let path = PathBuf::from("/home/user/.my.cnf");
+        assert_eq!(h.evaluate(&ctx("val", "KEY=val", &[], &[], &path)), 0.10);
+    }
+
+    #[test]
+    fn fps_fires_on_credentials_toml() {
+        let h = FilePathSignal;
+        let path = PathBuf::from("/home/user/.cargo/credentials.toml");
+        assert_eq!(h.evaluate(&ctx("val", "KEY=val", &[], &[], &path)), 0.10);
     }
 
     // ── AssignmentContext ────────────────────────────────────────────────────

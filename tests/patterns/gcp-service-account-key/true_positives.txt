@@ -1,0 +1,7 @@
+# GCP service account key fields
+"private_key": "-----BEGIN RSA PRIVATE KEY-----"
+"private_key_id": "abcdefghij1234567890abcdefghij1234567890ab"
+private_key = "-----BEGIN PRIVATE KEY-----"
+private_key_id = "ABCDEFGHIJ1234567890ABCDEFGHIJ1234567890ABCD"
+PRIVATE_KEY: "-----BEGIN EC PRIVATE KEY-----"
+"private_key":"MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEA"

@@ -1,0 +1,6 @@
+# Not GitHub App private keys
+-----BEGIN RSA PRIVATE KEY-----
+gitlab_app_key = "-----BEGIN PRIVATE KEY-----"
+github_token = "ghp_abc123"
+github_app = "some-app-name"
+random text with no key header

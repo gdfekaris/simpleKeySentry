@@ -1,0 +1,6 @@
+# Not GitLab PATs
+glpat-short
+glptt-abcdefghij1234567890
+gl_pat_abcdefghij1234567890
+gitlab-token-something
+random text not matching

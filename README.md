@@ -1,29 +1,44 @@
-# simpleKeySentry (sks) 
+# simpleKeySentry (sks)
 
-## v0.1.0
+## v0.2.0
 
-A privacy-first local secrets scanner. Finds leaked credentials in shell history, dotfiles, and environment files on your own machine — without sending anything off it.
+A privacy-first local secrets scanner. Finds leaked credentials in shell history, dotfiles, cloud CLI configs, SSH keys, and environment files on your own machine — without sending anything off it.
 
 **Zero network calls. Zero telemetry. Everything stays on your machine.**
 
 ## What it scans
 
 - **Shell history** — Bash, Zsh, and Fish history files for inline tokens, exported secrets, database connection strings
-- **Dotfiles** — `.bashrc`, `.zshrc`, `.profile`, `.gitconfig`, `.npmrc`, `.netrc`, `.pypirc`, and more
+- **Dotfiles** — `.bashrc`, `.zshrc`, `.profile`, `.bash_profile`, `.gitconfig`, and other shell configs
 - **Environment files** — `.env`, `.env.local`, `.env.production`, and variants found recursively under your project directories
+- **Cloud CLI configs** — AWS credentials/config, GCP application default credentials, Azure profile, Docker config, Kubernetes kubeconfig, GitHub CLI and Hub configs
+- **Application configs** — `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, `.my.cnf`, Cargo credentials, Gem credentials
+- **SSH keys** — unencrypted private keys, permissive file/directory permissions, authorized_keys audit, known_hosts plaintext hostnames
 
 ## What it detects
 
-20 built-in patterns covering:
+42 built-in patterns covering:
 
 - AWS access keys and secret keys
-- GitHub personal access tokens (classic and fine-grained) and OAuth tokens
+- GitHub personal access tokens (classic and fine-grained), OAuth tokens, and App private keys
+- GCP API keys and service account keys
+- Azure storage account keys
+- DigitalOcean tokens
+- GitLab personal and pipeline tokens
+- Bitbucket App passwords
 - Stripe secret and test keys
 - Slack bot and user tokens
-- Private keys (PEM format)
-- JWTs
+- Shopify access tokens
+- OpenAI and Anthropic API keys
+- Mailgun, SendGrid, Twilio, and Datadog API keys
+- HashiCorp Vault and Terraform tokens
+- Heroku, npm, and PyPI API keys
+- Private keys (PEM format) and SSH unencrypted key headers
+- Age encryption keys
+- JWTs and Kubernetes bearer tokens
 - Database connection strings with credentials
-- Heroku, Twilio, SendGrid, npm, and PyPI API keys
+- Basic-auth URLs
+- Docker registry auth tokens
 - Generic bearer tokens and high-entropy secrets
 
 Each match is scored with a confidence pipeline that combines regex pattern matching, Shannon entropy analysis, and 8 contextual heuristics to reduce false positives.
@@ -61,11 +76,23 @@ sks -v
 # JSON output (for scripting or piping to jq)
 sks -f json
 
+# HTML report (self-contained, shareable)
+sks -f html -o report.html
+
 # Write results to a file (created with 0600 permissions)
-sks -o report.txt
+sks -o report.json -f json
 
 # Quiet mode — just the summary line
 sks -q
+
+# Force a full scan (skip the incremental cache)
+sks scan --no-cache
+
+# Re-render a saved JSON report as HTML
+sks report report.json --format html -o report.html
+
+# Re-render a saved JSON report in the terminal
+sks report report.json
 ```
 
 ## Configuration
@@ -89,13 +116,28 @@ You can also place a `.sks.toml` in any project directory for project-specific s
 
 | Flag | Description |
 |---|---|
-| `-f, --format <FORMAT>` | Output format: `terminal` (default) or `json` |
+| `-f, --format <FORMAT>` | Output format: `terminal` (default), `json`, or `html` |
 | `-v, --verbose` | Show low and info-severity findings |
 | `-q, --quiet` | Show only the summary line |
 | `-o, --output <PATH>` | Write report to a file |
 | `--no-redact` | Show full secret values (use with caution) |
 | `--min-confidence <N>` | Minimum confidence threshold, 0-100 (default: 30) |
 | `--no-entropy` | Disable entropy analysis |
+| `--no-cache` | Disable incremental scanning cache (force full scan) |
+
+## Incremental scanning
+
+After the first scan, sks caches file metadata (mtime and size) so subsequent scans skip unchanged files. This makes re-scans near-instant. The cache is stored at `~/.local/share/sks/cache.json` (respects `$XDG_DATA_HOME`).
+
+Use `--no-cache` to force a full scan.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `sks scan [PATH]` | Scan for secrets (default when no command is given) |
+| `sks report <PATH>` | Re-render a saved JSON report in another format |
+| `sks init [--force]` | Create a default config file |
 
 ## Exit codes
 
@@ -117,7 +159,7 @@ The pipeline has three stages:
 
 1. **Collectors** read files and produce content items (lines with context)
 2. **Detection engine** matches patterns, computes entropy, applies heuristics, and scores each finding
-3. **Reporters** format the output for humans (terminal) or machines (JSON)
+3. **Reporters** format the output for humans (terminal), machines (JSON), or sharing (HTML)
 
 Confidence scoring: `base_confidence + entropy_delta + sum(heuristic_deltas)`, clamped to [0.0, 1.0]. Severity is derived from the final score:
 

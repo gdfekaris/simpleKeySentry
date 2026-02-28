@@ -1,0 +1,6 @@
+# Not Azure storage keys (too short or wrong context)
+AccountKey=abc123
+storage_key = "shortvalue"
+AZURE_STORAGE_ACCOUNT=mystorageaccount
+account_name: "mystorageaccount"
+random text with no key here

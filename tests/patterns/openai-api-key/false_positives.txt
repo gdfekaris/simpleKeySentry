@@ -1,0 +1,6 @@
+# Not OpenAI API keys
+sk-proj-short
+sk_live_abcdefghijklmnopqrstuvwx
+sk-test-abcdefghijklmnopqrstuvwx
+sk-notanopenaikey
+sk-ant-abcdefghijklmnopqrstuvwx

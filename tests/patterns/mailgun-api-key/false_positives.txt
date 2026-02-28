@@ -1,0 +1,6 @@
+# Not Mailgun API keys
+mailgun_domain=sandbox1234567890.mailgun.org
+key-tooshort
+MAILGUN_DOMAIN: mg.example.com
+api_key=key-0123456789abcdef0123456789abcdef
+random key that is not mailgun

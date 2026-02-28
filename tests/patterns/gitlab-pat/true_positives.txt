@@ -1,0 +1,6 @@
+# GitLab personal access tokens
+glpat-abcdefghij1234567890
+glpat-ABCDEFGHIJKLMNOPQRSTUVWX
+glpat-abc_def-ghi_jkl_mnop1234
+GITLAB_TOKEN=glpat-xyzABCDEFGHIJKLMNOPQRS
+export GL_PAT=glpat-12345678901234567890

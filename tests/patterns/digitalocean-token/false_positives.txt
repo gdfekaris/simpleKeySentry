@@ -1,0 +1,6 @@
+# Not DigitalOcean tokens
+dop_v1_tooshort
+dox_v1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+dop_v2_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+doppler_token_abc123
+digitalocean_droplet_id=12345678

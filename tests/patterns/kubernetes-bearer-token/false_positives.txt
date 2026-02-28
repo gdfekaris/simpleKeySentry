@@ -1,0 +1,6 @@
+# Not Kubernetes bearer tokens (too short)
+token: short-value
+bearer = "abc123"
+TOKEN=abcdefghijklmnopqrstuvwxyz
+token: less-than-100-chars-here-so-it-should-not-match-the-pattern
+Authorization: Bearer short

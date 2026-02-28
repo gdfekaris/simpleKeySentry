@@ -1,0 +1,6 @@
+# Not Shopify tokens
+shpat_short
+shpxx_aabbccdd00112233445566778899aabb
+shopify_token=something_else
+shpat-aabbccdd00112233445566778899aabb
+shp_aabbccdd00112233445566778899aabb00

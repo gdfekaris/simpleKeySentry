@@ -1,0 +1,6 @@
+# OpenAI API keys
+sk-proj-abcdefghijklmnopqrst
+sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
+sk-proj-abc_def-ghi_jkl_mnop12
+sk-abcdefghijklmnopqrstT3BlbkFJABCDEFGHIJKLMNOPQRST
+OPENAI_API_KEY=sk-proj-xyzABCDEFGHIJKLMNOP12

@@ -1,0 +1,6 @@
+# Shopify tokens (shpat_, shpss_, shpca_, shppa_)
+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
+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
+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
+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
+SHOPIFY_TOKEN=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

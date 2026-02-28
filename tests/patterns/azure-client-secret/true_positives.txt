@@ -1,0 +1,6 @@
+# Azure client secrets
+client_secret = "abcDEF1234567890~._-abcDEF1234567890"
+AZURE_CLIENT_SECRET=abcDEF1234567890abcDEF1234567890._ab
+azure_secret: "abcDEF1234567890~._-abcDEF1234567890"
+azure-secret = "ABCdef123456789012345678901234567890"
+client_secret: "7Kx~PQ_3bR.vN-cD8eF1gH2iJ4kL5mM6nO"

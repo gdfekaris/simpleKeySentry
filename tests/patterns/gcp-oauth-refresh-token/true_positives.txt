@@ -1,0 +1,6 @@
+# GCP OAuth refresh tokens
+"refresh_token": "1//0abcdefghijklmnopqrst"
+refresh_token = "1//0aBcDeFgHiJkLmNoPqRsT"
+client_secret = "1//0xYz1234567890abcdefg"
+"client_secret":"1//09876543210ABCDEFGHIJ"
+REFRESH_TOKEN: "1//0TestRefreshToken12345"

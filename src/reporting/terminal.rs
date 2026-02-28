@@ -193,12 +193,21 @@ pub(crate) fn format_terminal(result: &ScanResult, config: &ReportConfig) -> Str
         .map(source_type_label)
         .collect();
     writeln!(out, "\nScanning: {}", sources.join(", ")).unwrap();
-    writeln!(
-        out,
-        "Files scanned: {}  |  Time: {:.1}s",
-        result.scan_metadata.files_scanned, secs
-    )
-    .unwrap();
+    if result.scan_metadata.files_cached > 0 {
+        writeln!(
+            out,
+            "Files scanned: {} ({} cached)  |  Time: {:.1}s",
+            result.scan_metadata.files_scanned, result.scan_metadata.files_cached, secs
+        )
+        .unwrap();
+    } else {
+        writeln!(
+            out,
+            "Files scanned: {}  |  Time: {:.1}s",
+            result.scan_metadata.files_scanned, secs
+        )
+        .unwrap();
+    }
 
     let (crit, high, med, low, info) = severity_counts(&result.findings);
 
@@ -385,6 +394,7 @@ mod tests {
                 started_at: now,
                 completed_at: now,
                 files_scanned: 3,
+                files_cached: 0,
                 bytes_scanned: 1024,
                 targets_scanned: vec![SourceType::ShellHistory, SourceType::Dotfile],
                 sks_version: "0.1.0".to_string(),

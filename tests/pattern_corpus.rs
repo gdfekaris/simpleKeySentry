@@ -162,12 +162,126 @@ fn corpus_export_secret_assignment() {
     run_corpus_test("export-secret-assignment");
 }
 
-/// Sanity check: all 20 patterns compile successfully from a single RegexSet.
+// =========================================================================
+// Block 15 — Expanded Pattern Library (patterns 21–42)
+// =========================================================================
+
+#[test]
+fn corpus_gcp_service_account_key() {
+    run_corpus_test("gcp-service-account-key");
+}
+
+#[test]
+fn corpus_gcp_oauth_refresh_token() {
+    run_corpus_test("gcp-oauth-refresh-token");
+}
+
+#[test]
+fn corpus_azure_client_secret() {
+    run_corpus_test("azure-client-secret");
+}
+
+#[test]
+fn corpus_azure_storage_key() {
+    run_corpus_test("azure-storage-key");
+}
+
+#[test]
+fn corpus_azure_sas_token() {
+    run_corpus_test("azure-sas-token");
+}
+
+#[test]
+fn corpus_digitalocean_token() {
+    run_corpus_test("digitalocean-token");
+}
+
+#[test]
+fn corpus_gitlab_pat() {
+    run_corpus_test("gitlab-pat");
+}
+
+#[test]
+fn corpus_gitlab_pipeline_token() {
+    run_corpus_test("gitlab-pipeline-token");
+}
+
+#[test]
+fn corpus_bitbucket_app_password() {
+    run_corpus_test("bitbucket-app-password");
+}
+
+#[test]
+fn corpus_shopify_token() {
+    run_corpus_test("shopify-token");
+}
+
+#[test]
+fn corpus_mailgun_api_key() {
+    run_corpus_test("mailgun-api-key");
+}
+
+#[test]
+fn corpus_datadog_api_key() {
+    run_corpus_test("datadog-api-key");
+}
+
+#[test]
+fn corpus_hashicorp_vault_token() {
+    run_corpus_test("hashicorp-vault-token");
+}
+
+#[test]
+fn corpus_hashicorp_terraform_token() {
+    run_corpus_test("hashicorp-terraform-token");
+}
+
+#[test]
+fn corpus_openai_api_key() {
+    run_corpus_test("openai-api-key");
+}
+
+#[test]
+fn corpus_anthropic_api_key() {
+    run_corpus_test("anthropic-api-key");
+}
+
+#[test]
+fn corpus_docker_auth_base64() {
+    run_corpus_test("docker-auth-base64");
+}
+
+#[test]
+fn corpus_kubernetes_bearer_token() {
+    run_corpus_test("kubernetes-bearer-token");
+}
+
+#[test]
+fn corpus_ssh_unencrypted_key_header() {
+    run_corpus_test("ssh-unencrypted-key-header");
+}
+
+#[test]
+fn corpus_age_secret_key() {
+    run_corpus_test("age-secret-key");
+}
+
+#[test]
+fn corpus_github_app_private_key() {
+    run_corpus_test("github-app-private-key");
+}
+
+#[test]
+fn corpus_basic_auth_url() {
+    run_corpus_test("basic-auth-url");
+}
+
+/// Sanity check: all 42 patterns compile successfully from a single RegexSet.
 #[test]
 fn all_patterns_compile_in_regex_set() {
     use regex::RegexSet;
     let patterns = all_patterns();
-    assert_eq!(patterns.len(), 20, "Expected exactly 20 patterns");
+    assert_eq!(patterns.len(), 42, "Expected exactly 42 patterns");
     let regexes: Vec<&str> = patterns.iter().map(|p| p.regex.as_str()).collect();
     RegexSet::new(&regexes).expect("One or more patterns failed to compile in RegexSet");
 }

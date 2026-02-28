@@ -1,0 +1,6 @@
+# Azure SAS token signatures
+?sv=2020-08-04&ss=bfqt&sig=abcdefghijklmnopqrstuvwxyz12345
+&sig=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef%2B
+?sig=abcDEFghiJKLmnoPQR/stuVWXyz012345678==
+https://mystorage.blob.core.windows.net/container?sv=2020-08-04&sig=ABCDEFGHIJKLMNOPQRSTUVWXYZ123456%2F%2B%3D
+&sig=AAAA%2FBBBB%2FCCCC%2FDDDD%2FEEEE%2FFFFF

@@ -244,6 +244,7 @@ pub struct ScanMetadata {
     pub started_at: DateTime<Utc>,
     pub completed_at: DateTime<Utc>,
     pub files_scanned: usize,
+    pub files_cached: usize,
     pub bytes_scanned: u64,
     pub targets_scanned: Vec<SourceType>,
     pub sks_version: String,
@@ -270,6 +271,15 @@ pub trait Collector {
 
     /// Discover and yield all content items to be scanned.
     fn collect(&self, config: &crate::config::ScanConfig) -> Result<Vec<ContentItem>, SksError>;
+
+    /// Return pre-built findings that bypass the detection engine.
+    /// Only the SSH collector overrides this (permission checks, encryption status).
+    fn direct_findings(
+        &self,
+        _config: &crate::config::ScanConfig,
+    ) -> Result<Vec<Finding>, SksError> {
+        Ok(vec![])
+    }
 }
 
 // ---------------------------------------------------------------------------
