@@ -76,11 +76,35 @@ enum Command {
     Scan(ScanArgs),
     /// Re-render a saved JSON scan report in another format
     Report(ReportArgs),
+    /// Manage detection rules
+    Rules(RulesArgs),
     /// Create a default config file
     Init {
         /// Overwrite existing config file
         #[arg(long)]
         force: bool,
+    },
+}
+
+#[derive(Parser, Clone)]
+struct RulesArgs {
+    #[command(subcommand)]
+    command: RulesCommand,
+}
+
+#[derive(Subcommand, Clone)]
+enum RulesCommand {
+    /// List all built-in and custom detection rules
+    List {
+        /// Show regex patterns and remediation advice
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    /// Test a regex pattern against stdin
+    Test {
+        /// The regex pattern to test
+        #[arg(value_name = "REGEX")]
+        regex: String,
     },
 }
 
@@ -202,6 +226,7 @@ pub fn run() -> i32 {
         Some(Command::Init { force }) => run_init(force),
         Some(Command::Scan(args)) => run_scan(args),
         Some(Command::Report(args)) => run_report(args),
+        Some(Command::Rules(args)) => run_rules(args),
         None => run_scan(cli.scan_args),
     }
 }
@@ -350,7 +375,18 @@ fn run_scan(args: ScanArgs) -> i32 {
     targets_scanned.dedup_by(|a, b| std::mem::discriminant(a) == std::mem::discriminant(b));
 
     // 5. Initialize detection engine.
-    let compiled: Vec<CompiledPattern> = all_patterns()
+    let mut all_rules = all_patterns();
+    match crate::detection::custom_rules::load_custom_rules() {
+        Ok(custom) => {
+            if !custom.is_empty() {
+                progress(&format!("Loaded {} custom rule(s)", custom.len()), &config);
+                all_rules.extend(custom);
+            }
+        }
+        Err(e) => eprintln!("sks warn: {e}"),
+    }
+
+    let compiled: Vec<CompiledPattern> = all_rules
         .into_iter()
         .filter_map(|rule| match CompiledPattern::compile(rule) {
             Ok(cp) => Some(cp),
@@ -511,6 +547,96 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     // Exit code.
     if has_findings {
+        EXIT_FINDINGS
+    } else {
+        EXIT_CLEAN
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rules command
+// ---------------------------------------------------------------------------
+
+fn run_rules(args: RulesArgs) -> i32 {
+    match args.command {
+        RulesCommand::List { verbose } => run_rules_list(verbose),
+        RulesCommand::Test { regex } => run_rules_test(&regex),
+    }
+}
+
+fn run_rules_list(verbose: bool) -> i32 {
+    let builtins = all_patterns();
+    println!("Built-in rules ({}):", builtins.len());
+    for rule in &builtins {
+        if verbose {
+            println!("  {} - {}", rule.name, rule.description);
+            println!("    regex: {}", rule.regex);
+            println!("    confidence: {:.0}%", rule.base_confidence * 100.0);
+            println!("    remediation: {}", rule.remediation);
+        } else {
+            println!("  {} - {}", rule.name, rule.description);
+        }
+    }
+
+    match crate::detection::custom_rules::load_custom_rules() {
+        Ok(custom) if custom.is_empty() => {
+            println!(
+                "\nNo custom rules found. Add rules to {}",
+                crate::detection::custom_rules::rules_file_path().display()
+            );
+        }
+        Ok(custom) => {
+            println!("\nCustom rules ({}):", custom.len());
+            for rule in &custom {
+                if verbose {
+                    println!("  {} - {}", rule.name, rule.description);
+                    println!("    regex: {}", rule.regex);
+                    println!("    confidence: {:.0}%", rule.base_confidence * 100.0);
+                    println!("    remediation: {}", rule.remediation);
+                } else {
+                    println!("  {} - {}", rule.name, rule.description);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("sks warn: {e}");
+        }
+    }
+
+    EXIT_CLEAN
+}
+
+fn run_rules_test(pattern: &str) -> i32 {
+    let re = match regex::Regex::new(pattern) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("sks error: invalid regex: {e}");
+            return EXIT_ERROR;
+        }
+    };
+
+    use std::io::BufRead;
+    let stdin = std::io::stdin();
+    let mut match_count: usize = 0;
+
+    for (line_num, line_result) in stdin.lock().lines().enumerate() {
+        let line = match line_result {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("sks error: reading stdin: {e}");
+                return EXIT_ERROR;
+            }
+        };
+
+        for m in re.find_iter(&line) {
+            println!("{}:{}:{} {}", line_num + 1, m.start(), m.end(), &line);
+            match_count += 1;
+        }
+    }
+
+    println!("\n{} match(es) found.", match_count);
+
+    if match_count > 0 {
         EXIT_FINDINGS
     } else {
         EXIT_CLEAN

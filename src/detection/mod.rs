@@ -1,3 +1,4 @@
+pub mod custom_rules;
 pub mod entropy;
 pub mod heuristics;
 pub mod patterns;
