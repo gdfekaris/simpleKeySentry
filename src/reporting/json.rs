@@ -101,6 +101,7 @@ pub(crate) fn format_json(result: &ScanResult, config: &ReportConfig) -> Result<
             "completed_at": meta.completed_at.to_rfc3339(),
             "files_scanned": meta.files_scanned,
             "files_cached": meta.files_cached,
+            "findings_suppressed": meta.findings_suppressed,
             "bytes_scanned": meta.bytes_scanned,
             "targets_scanned": targets,
         },
@@ -257,6 +258,10 @@ pub fn parse_json_report(input: &str) -> Result<ScanResult, SksError> {
         .get("files_cached")
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as usize;
+    let findings_suppressed = scan
+        .get("findings_suppressed")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as usize;
     let bytes_scanned = json_u64(scan, "bytes_scanned")?;
 
     let targets_scanned: Vec<SourceType> = scan
@@ -283,6 +288,7 @@ pub fn parse_json_report(input: &str) -> Result<ScanResult, SksError> {
             completed_at,
             files_scanned,
             files_cached,
+            findings_suppressed,
             bytes_scanned,
             targets_scanned,
             sks_version: version,
@@ -384,6 +390,7 @@ mod tests {
                 completed_at: now,
                 files_scanned: 47,
                 files_cached: 0,
+                findings_suppressed: 0,
                 bytes_scanned: 1048576,
                 targets_scanned: vec![SourceType::ShellHistory],
                 sks_version: "0.1.0".to_string(),

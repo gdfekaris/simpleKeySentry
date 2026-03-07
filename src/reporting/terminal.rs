@@ -240,6 +240,20 @@ pub(crate) fn format_terminal(result: &ScanResult, config: &ReportConfig) -> Str
     } else {
         write!(out, "\n──\n").unwrap();
     }
+    if result.scan_metadata.findings_suppressed > 0 {
+        writeln!(
+            out,
+            "{} finding{} suppressed by .sentryignore",
+            result.scan_metadata.findings_suppressed,
+            if result.scan_metadata.findings_suppressed == 1 {
+                ""
+            } else {
+                "s"
+            }
+        )
+        .unwrap();
+    }
+
     write!(out, "Summary: {crit} critical, {high} high, {med} medium",).unwrap();
 
     match config.verbosity {
@@ -395,6 +409,7 @@ mod tests {
                 completed_at: now,
                 files_scanned: 3,
                 files_cached: 0,
+                findings_suppressed: 0,
                 bytes_scanned: 1024,
                 targets_scanned: vec![SourceType::ShellHistory, SourceType::Dotfile],
                 sks_version: "0.1.0".to_string(),

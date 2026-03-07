@@ -3,6 +3,7 @@ pub mod cli;
 pub mod collectors;
 pub mod config;
 pub mod detection;
+pub mod ignore;
 pub mod models;
 pub mod reporting;
 

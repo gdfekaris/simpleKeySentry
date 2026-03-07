@@ -244,6 +244,9 @@ impl Collector for DotfileCollector {
         let mut items = Vec::new();
         for raw in &config.dotfile_targets {
             let path = expand_tilde(raw);
+            if config.ignore_rules.is_path_excluded(&path) {
+                continue;
+            }
             if let Some(found) = try_read_file(&path, SourceType::Dotfile, config.max_file_size)? {
                 items.extend(found);
             }
@@ -346,6 +349,10 @@ impl Collector for EnvFileCollector {
                     continue;
                 }
 
+                if config.ignore_rules.is_path_excluded(path) {
+                    continue;
+                }
+
                 if let Some(found) = try_read_file(path, SourceType::EnvFile, config.max_file_size)?
                 {
                     items.extend(found);
@@ -397,6 +404,7 @@ mod tests {
             extra_paths: vec![],
             exclude_paths: vec![],
             exclude_patterns: vec![],
+            ignore_rules: crate::ignore::IgnoreRules::empty(),
         }
     }
 

@@ -322,6 +322,9 @@ impl Collector for BashHistoryCollector {
 
     fn collect(&self, config: &ScanConfig) -> Result<Vec<ContentItem>, SksError> {
         let path = Self::history_path();
+        if config.ignore_rules.is_path_excluded(&path) {
+            return Ok(Vec::new());
+        }
         let text = match try_read_history(&path, config.max_file_size)? {
             Some(t) => t,
             None => return Ok(Vec::new()),
@@ -359,6 +362,9 @@ impl Collector for ZshHistoryCollector {
 
     fn collect(&self, config: &ScanConfig) -> Result<Vec<ContentItem>, SksError> {
         let path = Self::history_path();
+        if config.ignore_rules.is_path_excluded(&path) {
+            return Ok(Vec::new());
+        }
         let text = match try_read_history(&path, config.max_file_size)? {
             Some(t) => t,
             None => return Ok(Vec::new()),
@@ -396,6 +402,9 @@ impl Collector for FishHistoryCollector {
 
     fn collect(&self, config: &ScanConfig) -> Result<Vec<ContentItem>, SksError> {
         let path = Self::history_path();
+        if config.ignore_rules.is_path_excluded(&path) {
+            return Ok(Vec::new());
+        }
         let text = match try_read_history(&path, config.max_file_size)? {
             Some(t) => t,
             None => return Ok(Vec::new()),
@@ -444,6 +453,7 @@ mod tests {
             extra_paths: vec![],
             exclude_paths: vec![],
             exclude_patterns: vec![],
+            ignore_rules: crate::ignore::IgnoreRules::empty(),
         }
     }
 

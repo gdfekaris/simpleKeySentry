@@ -45,6 +45,7 @@ pub struct ScanConfig {
     pub extra_paths: Vec<PathBuf>,
     pub exclude_paths: Vec<PathBuf>,
     pub exclude_patterns: Vec<String>,
+    pub ignore_rules: crate::ignore::IgnoreRules,
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +108,7 @@ impl Default for ScanConfig {
             extra_paths: Vec::new(),
             exclude_paths: Vec::new(),
             exclude_patterns: Vec::new(),
+            ignore_rules: crate::ignore::IgnoreRules::empty(),
         }
     }
 }

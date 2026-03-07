@@ -150,7 +150,11 @@ pub(crate) fn format_html(result: &ScanResult, config: &ReportConfig) -> String 
     if meta.files_cached > 0 {
         write!(out, " ({} cached)", meta.files_cached).unwrap();
     }
-    writeln!(out, " &mdash; {secs:.1}s</p></header>").unwrap();
+    write!(out, " &mdash; {secs:.1}s").unwrap();
+    if meta.findings_suppressed > 0 {
+        write!(out, " &mdash; {} suppressed", meta.findings_suppressed).unwrap();
+    }
+    writeln!(out, "</p></header>").unwrap();
 
     // Summary dashboard
     writeln!(out, "<section class=\"summary\">").unwrap();
@@ -479,6 +483,7 @@ mod tests {
                 completed_at: now,
                 files_scanned: 47,
                 files_cached: 0,
+                findings_suppressed: 0,
                 bytes_scanned: 1048576,
                 targets_scanned: vec![SourceType::ShellHistory],
                 sks_version: "0.1.0".to_string(),
@@ -660,6 +665,7 @@ mod tests {
                 completed_at: now,
                 files_scanned: 47,
                 files_cached: 10,
+                findings_suppressed: 0,
                 bytes_scanned: 1024,
                 targets_scanned: vec![SourceType::ShellHistory],
                 sks_version: "0.1.0".to_string(),

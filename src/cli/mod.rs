@@ -330,7 +330,10 @@ fn run_scan(args: ScanArgs) -> i32 {
         config.scan.extra_paths.push(path.clone());
     }
 
-    // 3b. Load incremental scanning cache.
+    // 3b. Load .sentryignore rules.
+    config.scan.ignore_rules = crate::ignore::IgnoreRules::load();
+
+    // 3c. Load incremental scanning cache.
     let cache_file = cache::cache_path();
     let mut scan_cache = if no_cache {
         ScanCache::new()
@@ -428,6 +431,11 @@ fn run_scan(args: ScanArgs) -> i32 {
     // Merge direct findings so they go through the same filter/sort.
     findings.extend(direct_findings);
 
+    // 7b. Filter suppressed fingerprints from .sentryignore.
+    let pre_suppress = findings.len();
+    findings.retain(|f| !config.scan.ignore_rules.is_fingerprint_excluded(&f.id));
+    let findings_suppressed = pre_suppress - findings.len();
+
     // 8. Filter by min_confidence and sort.
     findings.retain(|f| f.confidence >= config.detection.min_confidence);
     findings.sort_by(|a, b| {
@@ -475,6 +483,7 @@ fn run_scan(args: ScanArgs) -> i32 {
             completed_at,
             files_scanned,
             files_cached,
+            findings_suppressed,
             bytes_scanned,
             targets_scanned,
             sks_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -769,6 +778,7 @@ mod tests {
                 completed_at: now,
                 files_scanned: 10,
                 files_cached: 2,
+                findings_suppressed: 0,
                 bytes_scanned: 4096,
                 targets_scanned: vec![SourceType::EnvFile],
                 sks_version: "0.1.0".to_string(),
@@ -879,6 +889,7 @@ mod tests {
                 completed_at: now,
                 files_scanned: 5,
                 files_cached: 0,
+                findings_suppressed: 0,
                 bytes_scanned: 1024,
                 targets_scanned: vec![],
                 sks_version: "0.1.0".to_string(),

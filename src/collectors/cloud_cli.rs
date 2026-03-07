@@ -135,6 +135,11 @@ impl Collector for CloudCliCollector {
             .collect();
 
         for target in cloud_config_targets() {
+            // Check .sentryignore path exclusions.
+            if config.ignore_rules.is_path_excluded(&target.path) {
+                continue;
+            }
+
             // Check exclude_paths.
             if config
                 .exclude_paths
@@ -205,6 +210,7 @@ mod tests {
             extra_paths: vec![],
             exclude_paths: vec![],
             exclude_patterns: vec![],
+            ignore_rules: crate::ignore::IgnoreRules::empty(),
         }
     }
 

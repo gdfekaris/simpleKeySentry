@@ -98,6 +98,9 @@ fn ssh_dir() -> Option<PathBuf> {
 
 /// Returns `true` if the path should be skipped based on exclusion config.
 fn is_excluded(path: &Path, config: &ScanConfig, exclude_regexes: &[regex::Regex]) -> bool {
+    if config.ignore_rules.is_path_excluded(path) {
+        return true;
+    }
     if config
         .exclude_paths
         .iter()
@@ -425,6 +428,7 @@ mod tests {
             extra_paths: vec![],
             exclude_paths: vec![],
             exclude_patterns: vec![],
+            ignore_rules: crate::ignore::IgnoreRules::empty(),
         }
     }
 
