@@ -657,30 +657,22 @@ mod tests {
         assert_eq!(items[0].source_type, SourceType::ShellHistory);
     }
 
-    // ── Collector trait tests ───────────────────────────────────────────────
-
-    #[test]
-    fn bash_is_available_false_when_missing() {
-        // Override HOME to a dir that has no .bash_history
-        let dir = tmp("bash_avail");
-        std::env::set_var("HOME", &dir);
-        let collector = BashHistoryCollector;
-        assert!(!collector.is_available());
-        let _ = std::fs::remove_dir_all(&dir);
-    }
+    // ── Collector integration tests (via try_read_history + parsers) ──────
 
     #[test]
     fn bash_collects_commands() {
         let dir = tmp("bash_collect");
-        let history = dir.join(".bash_history");
+        let history = dir.join("bash_history");
         write_file(
             &history,
             "ls -la\ncurl -H 'Authorization: Bearer secret123'\ncd /tmp\n",
         );
-        std::env::set_var("HOME", &dir);
 
-        let config = scan_config();
-        let items = BashHistoryCollector.collect(&config).unwrap();
+        let text = try_read_history(&history, 10 * 1024 * 1024)
+            .unwrap()
+            .unwrap();
+        let commands = parse_bash_history(&text);
+        let items = commands_to_items(&history, &commands);
         assert_eq!(items.len(), 3);
         assert_eq!(items[0].line, "ls -la");
         assert_eq!(items[1].line, "curl -H 'Authorization: Bearer secret123'");
@@ -693,15 +685,17 @@ mod tests {
     #[test]
     fn zsh_collects_and_strips_timestamps() {
         let dir = tmp("zsh_collect");
-        let history = dir.join(".zsh_history");
+        let history = dir.join("zsh_history");
         write_file(
             &history,
             ": 1700000000:0;ls -la\n: 1700000001:0;export API_KEY=secret\n",
         );
-        std::env::set_var("HOME", &dir);
 
-        let config = scan_config();
-        let items = ZshHistoryCollector.collect(&config).unwrap();
+        let text = try_read_history(&history, 10 * 1024 * 1024)
+            .unwrap()
+            .unwrap();
+        let commands = parse_zsh_history(&text);
+        let items = commands_to_items(&history, &commands);
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].line, "ls -la");
         assert_eq!(items[1].line, "export API_KEY=secret");
@@ -712,8 +706,7 @@ mod tests {
     #[test]
     fn fish_collects_commands() {
         let dir = tmp("fish_collect");
-        let fish_dir = dir.join(".local/share/fish");
-        let history = fish_dir.join("fish_history");
+        let history = dir.join("fish_history");
         write_file(
             &history,
             concat!(
@@ -723,10 +716,12 @@ mod tests {
                 "  when: 1700000001\n",
             ),
         );
-        std::env::set_var("HOME", &dir);
 
-        let config = scan_config();
-        let items = FishHistoryCollector.collect(&config).unwrap();
+        let text = try_read_history(&history, 10 * 1024 * 1024)
+            .unwrap()
+            .unwrap();
+        let commands = parse_fish_history(&text);
+        let items = commands_to_items(&history, &commands);
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].line, "ls -la");
         assert_eq!(items[1].line, "export TOKEN=abc123");
@@ -737,13 +732,14 @@ mod tests {
     #[test]
     fn empty_history_yields_empty_vec() {
         let dir = tmp("empty_hist");
-        let history = dir.join(".bash_history");
+        let history = dir.join("bash_history");
         write_file(&history, "");
-        std::env::set_var("HOME", &dir);
 
-        let config = scan_config();
-        let items = BashHistoryCollector.collect(&config).unwrap();
-        assert!(items.is_empty());
+        let text = try_read_history(&history, 10 * 1024 * 1024)
+            .unwrap()
+            .unwrap();
+        let commands = parse_bash_history(&text);
+        assert!(commands.is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -751,27 +747,24 @@ mod tests {
     #[test]
     fn binary_file_skipped() {
         let dir = tmp("binary_hist");
-        let history = dir.join(".bash_history");
+        let history = dir.join("bash_history");
         // Write binary content (null bytes).
         let mut f = std::fs::File::create(&history).unwrap();
         f.write_all(b"ls\x00binary\xffgarbage").unwrap();
-        std::env::set_var("HOME", &dir);
 
-        let config = scan_config();
-        let items = BashHistoryCollector.collect(&config).unwrap();
-        assert!(items.is_empty());
+        let result = try_read_history(&history, 10 * 1024 * 1024).unwrap();
+        assert!(result.is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn missing_history_yields_empty_vec() {
+    fn missing_history_yields_none() {
         let dir = tmp("missing_hist");
-        std::env::set_var("HOME", &dir);
+        let history = dir.join("nonexistent_history");
 
-        let config = scan_config();
-        let items = BashHistoryCollector.collect(&config).unwrap();
-        assert!(items.is_empty());
+        let result = try_read_history(&history, 10 * 1024 * 1024).unwrap();
+        assert!(result.is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

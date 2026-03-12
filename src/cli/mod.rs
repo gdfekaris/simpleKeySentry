@@ -376,7 +376,11 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     // 5. Initialize detection engine.
     let mut all_rules = all_patterns();
-    match crate::detection::custom_rules::load_custom_rules() {
+    let custom_result = match &config.rules_path {
+        Some(path) => crate::detection::custom_rules::load_custom_rules_from(path),
+        None => crate::detection::custom_rules::load_custom_rules(),
+    };
+    match custom_result {
         Ok(custom) => {
             if !custom.is_empty() {
                 progress(&format!("Loaded {} custom rule(s)", custom.len()), &config);
@@ -568,14 +572,7 @@ fn run_rules_list(verbose: bool) -> i32 {
     let builtins = all_patterns();
     println!("Built-in rules ({}):", builtins.len());
     for rule in &builtins {
-        if verbose {
-            println!("  {} - {}", rule.name, rule.description);
-            println!("    regex: {}", rule.regex);
-            println!("    confidence: {:.0}%", rule.base_confidence * 100.0);
-            println!("    remediation: {}", rule.remediation);
-        } else {
-            println!("  {} - {}", rule.name, rule.description);
-        }
+        print_rule(rule, verbose);
     }
 
     match crate::detection::custom_rules::load_custom_rules() {
@@ -588,14 +585,7 @@ fn run_rules_list(verbose: bool) -> i32 {
         Ok(custom) => {
             println!("\nCustom rules ({}):", custom.len());
             for rule in &custom {
-                if verbose {
-                    println!("  {} - {}", rule.name, rule.description);
-                    println!("    regex: {}", rule.regex);
-                    println!("    confidence: {:.0}%", rule.base_confidence * 100.0);
-                    println!("    remediation: {}", rule.remediation);
-                } else {
-                    println!("  {} - {}", rule.name, rule.description);
-                }
+                print_rule(rule, verbose);
             }
         }
         Err(e) => {
@@ -604,6 +594,19 @@ fn run_rules_list(verbose: bool) -> i32 {
     }
 
     EXIT_CLEAN
+}
+
+fn print_rule(rule: &crate::detection::PatternRule, verbose: bool) {
+    println!(
+        "  {:<30} {:<40} confidence: {:.0}%",
+        rule.name,
+        rule.description,
+        rule.base_confidence * 100.0
+    );
+    if verbose {
+        println!("    regex: {}", rule.regex);
+        println!("    remediation: {}", rule.remediation);
+    }
 }
 
 fn run_rules_test(pattern: &str) -> i32 {

@@ -84,22 +84,41 @@ impl IgnoreRules {
     /// Loads user + project `.sentryignore` files, merges, never errors.
     /// Missing files are silently ignored.
     pub fn load() -> Self {
+        Self::load_from_paths(&user_ignore_path(), &project_ignore_path())
+    }
+
+    /// Loads from explicit file paths. Missing files are silently ignored.
+    /// Exposed for testing without mutating global env/CWD.
+    pub(crate) fn load_from_paths(user_path: &Path, project_path: &Path) -> Self {
         let mut glob_patterns = Vec::new();
         let mut fingerprints = HashSet::new();
 
-        // Load user-level file.
-        let user_path = user_ignore_path();
         if user_path.exists() {
-            parse_file(&user_path, &mut glob_patterns, &mut fingerprints);
+            parse_file(user_path, &mut glob_patterns, &mut fingerprints);
         }
 
-        // Load project-level file.
-        let project_path = project_ignore_path();
         if project_path.exists() {
-            parse_file(&project_path, &mut glob_patterns, &mut fingerprints);
+            parse_file(project_path, &mut glob_patterns, &mut fingerprints);
         }
 
-        // Compile glob patterns.
+        Self::compile(glob_patterns, fingerprints)
+    }
+
+    /// Constructs from raw lines (for testing).
+    #[cfg(test)]
+    fn from_lines(lines: &[&str]) -> Self {
+        let mut glob_patterns = Vec::new();
+        let mut fingerprints = HashSet::new();
+
+        for line in lines {
+            parse_line(line, &mut glob_patterns, &mut fingerprints);
+        }
+
+        Self::compile(glob_patterns, fingerprints)
+    }
+
+    /// Compiles parsed glob patterns and fingerprints into an `IgnoreRules`.
+    fn compile(glob_patterns: Vec<String>, fingerprints: HashSet<String>) -> Self {
         let mut builder = GlobSetBuilder::new();
         let mut valid_count = 0;
         for pattern in &glob_patterns {
@@ -121,39 +140,6 @@ impl IgnoreRules {
                 GlobSet::empty()
             }
         };
-
-        IgnoreRules {
-            globs: Arc::new(glob_set),
-            fingerprints,
-            path_pattern_count: valid_count,
-        }
-    }
-
-    /// Constructs from raw lines (for testing).
-    #[cfg(test)]
-    fn from_lines(lines: &[&str]) -> Self {
-        let mut glob_patterns = Vec::new();
-        let mut fingerprints = HashSet::new();
-
-        for line in lines {
-            parse_line(line, &mut glob_patterns, &mut fingerprints);
-        }
-
-        let mut builder = GlobSetBuilder::new();
-        let mut valid_count = 0;
-        for pattern in &glob_patterns {
-            match Glob::new(pattern) {
-                Ok(g) => {
-                    builder.add(g);
-                    valid_count += 1;
-                }
-                Err(e) => {
-                    eprintln!("sks warn: invalid glob pattern '{pattern}': {e}");
-                }
-            }
-        }
-
-        let glob_set = builder.build().unwrap_or_else(|_| GlobSet::empty());
 
         IgnoreRules {
             globs: Arc::new(glob_set),
@@ -214,10 +200,18 @@ fn parse_line(line: &str, glob_patterns: &mut Vec<String>, fingerprints: &mut Ha
 
     // Fingerprint line: `fingerprint:sha256:<hex>`
     if let Some(rest) = trimmed.strip_prefix("fingerprint:") {
-        let fp = rest.trim().to_string();
-        if !fp.is_empty() {
-            fingerprints.insert(fp);
+        let fp = rest.trim();
+        if fp.is_empty() {
+            return;
         }
+        if !fp.starts_with("sha256:") {
+            eprintln!(
+                "sks warn: malformed fingerprint '{fp}' \
+                 (expected 'sha256:<hex>'), skipped"
+            );
+            return;
+        }
+        fingerprints.insert(fp.to_string());
         return;
     }
 
@@ -378,15 +372,23 @@ mod tests {
     }
 
     #[test]
+    fn malformed_fingerprint_rejected() {
+        // Missing "sha256:" prefix — should be skipped with a warning.
+        let rules = IgnoreRules::from_lines(&[
+            "fingerprint:not_a_sha256_hash",
+            "fingerprint:sha256:valid_one",
+        ]);
+        assert_eq!(rules.fingerprint_count(), 1);
+        assert!(rules.is_fingerprint_excluded("sha256:valid_one"));
+        assert!(!rules.is_fingerprint_excluded("not_a_sha256_hash"));
+    }
+
+    #[test]
     fn load_missing_files_returns_empty() {
-        // Point HOME and CWD to dirs with no .sentryignore.
         let dir = tmp("load_missing");
-        std::env::set_var("HOME", &dir);
-        std::env::set_var("XDG_CONFIG_HOME", dir.join("xdg"));
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
-        let rules = IgnoreRules::load();
-        std::env::set_current_dir(&original_dir).unwrap();
+        let user_path = dir.join("nonexistent_user/.sentryignore");
+        let project_path = dir.join("nonexistent_project/.sentryignore");
+        let rules = IgnoreRules::load_from_paths(&user_path, &project_path);
         assert_eq!(rules.path_pattern_count(), 0);
         assert_eq!(rules.fingerprint_count(), 0);
         let _ = fs::remove_dir_all(&dir);
@@ -397,31 +399,20 @@ mod tests {
         let dir = tmp("load_merge");
 
         // User-level file.
-        let user_dir = dir.join("xdg/sks");
+        let user_path = dir.join("user/.sentryignore");
         write_file(
-            &user_dir.join(".sentryignore"),
+            &user_path,
             "/tmp/user-excluded/**\nfingerprint:sha256:user111\n",
         );
 
-        // Project-level file (in CWD).
-        let project_dir = dir.join("project");
-        fs::create_dir_all(&project_dir).unwrap();
+        // Project-level file.
+        let project_path = dir.join("project/.sentryignore");
         write_file(
-            &project_dir.join(".sentryignore"),
+            &project_path,
             "/tmp/project-excluded/**\nfingerprint:sha256:proj222\n",
         );
 
-        std::env::set_var("HOME", &dir);
-        std::env::set_var("XDG_CONFIG_HOME", dir.join("xdg"));
-
-        // Change to project dir to pick up project .sentryignore.
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&project_dir).unwrap();
-
-        let rules = IgnoreRules::load();
-
-        // Restore CWD.
-        std::env::set_current_dir(&original_dir).unwrap();
+        let rules = IgnoreRules::load_from_paths(&user_path, &project_path);
 
         assert_eq!(rules.path_pattern_count(), 2);
         assert_eq!(rules.fingerprint_count(), 2);

@@ -31,6 +31,8 @@ pub struct SksConfig {
     pub scan: ScanConfig,
     pub detection: DetectionConfig,
     pub report: ReportConfig,
+    /// Path to custom rules TOML file (default: `~/.config/sks/rules.toml`).
+    pub rules_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -259,6 +261,7 @@ struct TomlScanConfig {
 struct TomlDetectionConfig {
     min_confidence: Option<u8>, // 0–100 in TOML; converted to 0.0–1.0 internally
     entropy_enabled: Option<bool>,
+    rules_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -318,6 +321,11 @@ fn merge_toml(config: &mut SksConfig, toml: TomlConfig) -> Result<(), SksError> 
     }
     if let Some(v) = d.entropy_enabled {
         config.detection.entropy_enabled = v;
+    }
+    if let Some(v) = &d.rules_path {
+        if !v.is_empty() {
+            config.rules_path = Some(tilde_expand(v));
+        }
     }
 
     let r = &toml.report;
@@ -484,6 +492,7 @@ pub fn generate_default_config() -> String {
 [detection]
 # min_confidence = 30       # Minimum confidence to report, 0–100 (default: 30)
 # entropy_enabled = true    # Use entropy analysis to reduce false positives
+# rules_path = "~/.config/sks/rules.toml"  # Path to custom detection rules
 
 [report]
 # format = "terminal"       # Output format: terminal | json | html | sarif

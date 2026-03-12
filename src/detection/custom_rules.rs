@@ -110,11 +110,8 @@ pub fn parse_custom_rules(toml_content: &str) -> Result<Vec<PatternRule>, SksErr
         }
 
         // Regex validation → skip on failure
-        if regex::Regex::new(&tr.regex).is_err() {
-            eprintln!(
-                "sks warn: custom rule '{}' has invalid regex, skipped",
-                tr.name
-            );
+        if let Err(e) = regex::Regex::new(&tr.regex) {
+            eprintln!("sks warn: custom rule '{}' has invalid regex: {e}", tr.name);
             continue;
         }
 
