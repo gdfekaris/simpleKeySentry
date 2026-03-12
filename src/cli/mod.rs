@@ -22,6 +22,7 @@ use clap::{Parser, Subcommand};
 
 use crate::cache::{self, CacheEntry, ScanCache};
 use crate::collectors::app_config::AppConfigCollector;
+use crate::collectors::browser::BrowserCollector;
 use crate::collectors::clipboard::ClipboardCollector;
 use crate::collectors::cloud_cli::CloudCliCollector;
 use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
@@ -150,6 +151,10 @@ struct ScanArgs {
     /// Scan clipboard contents (opt-in, privacy-sensitive)
     #[arg(long)]
     clipboard: bool,
+
+    /// Scan browser localStorage (opt-in, privacy-sensitive)
+    #[arg(long)]
+    browser: bool,
 }
 
 #[derive(Parser, Clone)]
@@ -214,7 +219,7 @@ impl ScanArgs {
             no_entropy: self.no_entropy,
             no_cache: self.no_cache,
             clipboard: if self.clipboard { Some(true) } else { None },
-            browser: None,
+            browser: if self.browser { Some(true) } else { None },
         })
     }
 }
@@ -504,6 +509,9 @@ fn run_scan(args: ScanArgs) -> i32 {
             if crate::collectors::clipboard::is_clipboard_path(&item.path) {
                 continue;
             }
+            if crate::collectors::browser::is_browser_path(&item.path) {
+                continue;
+            }
             if !scan_cache.entries.contains_key(&item.path) {
                 if let Ok(meta) = std::fs::metadata(&item.path) {
                     let count = findings_per_path.get(&item.path).copied().unwrap_or(0);
@@ -671,6 +679,7 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
         Box::new(ZshHistoryCollector),
         Box::new(FishHistoryCollector),
         Box::new(ClipboardCollector),
+        Box::new(BrowserCollector),
     ];
     candidates
         .into_iter()
@@ -727,6 +736,7 @@ mod tests {
             no_entropy: false,
             no_cache: false,
             clipboard: false,
+            browser: false,
         };
         let overrides = args.to_overrides().unwrap();
         assert!(overrides.format.is_none());
@@ -887,6 +897,7 @@ mod tests {
             no_entropy: false,
             no_cache: false,
             clipboard: false,
+            browser: false,
         }
     }
 
