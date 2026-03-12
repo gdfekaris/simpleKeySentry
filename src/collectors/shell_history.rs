@@ -441,22 +441,6 @@ mod tests {
         f.write_all(content.as_bytes()).unwrap();
     }
 
-    fn scan_config() -> ScanConfig {
-        ScanConfig {
-            clipboard: false,
-            browser: false,
-            follow_symlinks: false,
-            max_file_size: 1024 * 1024,
-            max_depth: 10,
-            dotfile_targets: vec![],
-            env_search_roots: vec![],
-            extra_paths: vec![],
-            exclude_paths: vec![],
-            exclude_patterns: vec![],
-            ignore_rules: crate::ignore::IgnoreRules::empty(),
-        }
-    }
-
     // ── Bash parser unit tests ──────────────────────────────────────────────
 
     #[test]

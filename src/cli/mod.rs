@@ -22,6 +22,7 @@ use clap::{Parser, Subcommand};
 
 use crate::cache::{self, CacheEntry, ScanCache};
 use crate::collectors::app_config::AppConfigCollector;
+use crate::collectors::clipboard::ClipboardCollector;
 use crate::collectors::cloud_cli::CloudCliCollector;
 use crate::collectors::filesystem::{DotfileCollector, EnvFileCollector};
 use crate::collectors::shell_history::{
@@ -145,6 +146,10 @@ struct ScanArgs {
     /// Disable incremental scanning cache (force full scan)
     #[arg(long)]
     no_cache: bool,
+
+    /// Scan clipboard contents (opt-in, privacy-sensitive)
+    #[arg(long)]
+    clipboard: bool,
 }
 
 #[derive(Parser, Clone)]
@@ -208,7 +213,7 @@ impl ScanArgs {
             min_confidence,
             no_entropy: self.no_entropy,
             no_cache: self.no_cache,
-            clipboard: None,
+            clipboard: if self.clipboard { Some(true) } else { None },
             browser: None,
         })
     }
@@ -494,7 +499,11 @@ fn run_scan(args: ScanArgs) -> i32 {
         }
 
         // Update cache entries for all re-scanned files.
+        // Skip clipboard items — clipboard content must never be persisted.
         for item in &all_items {
+            if crate::collectors::clipboard::is_clipboard_path(&item.path) {
+                continue;
+            }
             if !scan_cache.entries.contains_key(&item.path) {
                 if let Ok(meta) = std::fs::metadata(&item.path) {
                     let count = findings_per_path.get(&item.path).copied().unwrap_or(0);
@@ -661,6 +670,7 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
         Box::new(BashHistoryCollector),
         Box::new(ZshHistoryCollector),
         Box::new(FishHistoryCollector),
+        Box::new(ClipboardCollector),
     ];
     candidates
         .into_iter()
@@ -716,6 +726,7 @@ mod tests {
             min_confidence: None,
             no_entropy: false,
             no_cache: false,
+            clipboard: false,
         };
         let overrides = args.to_overrides().unwrap();
         assert!(overrides.format.is_none());
@@ -875,6 +886,7 @@ mod tests {
             min_confidence: None,
             no_entropy: false,
             no_cache: false,
+            clipboard: false,
         }
     }
 

@@ -25,6 +25,7 @@ clap = { version = "4", features = ["derive"] } # CLI argument parsing
 serde_yaml_ng = "0.10" # YAML config parsing for structured file extractor
 rust-ini = "0.21" # INI config parsing for structured file extractor
 globset = "0.4" # gitignore-style glob pattern matching for .sentryignore path exclusions
+rusqlite = { version = "0.32", features = ["bundled"] } # read-only SQLite access for clipboard managers (Clipy, CopyQ) and Firefox localStorage
 
 [profile.release]
 lto = true
