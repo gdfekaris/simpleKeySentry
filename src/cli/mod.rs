@@ -186,6 +186,21 @@ struct ReportArgs {
 }
 
 impl ScanArgs {
+    /// Returns true if all fields are at their default values (no flags given).
+    fn is_default(&self) -> bool {
+        self.path.is_none()
+            && self.format.is_none()
+            && !self.verbose
+            && !self.quiet
+            && self.output.is_none()
+            && !self.no_redact
+            && self.min_confidence.is_none()
+            && !self.no_entropy
+            && !self.no_cache
+            && !self.clipboard
+            && !self.browser
+    }
+
     /// Convert parsed CLI arguments into a `CliOverrides` struct.
     fn to_overrides(&self) -> Result<CliOverrides, String> {
         let format = match &self.format {
@@ -239,7 +254,13 @@ pub fn run() -> i32 {
         Some(Command::Scan(args)) => run_scan(args),
         Some(Command::Report(args)) => run_report(args),
         Some(Command::Rules(args)) => run_rules(args),
-        None => run_scan(cli.scan_args),
+        None => {
+            if cli.scan_args.is_default() && crate::interactive::InteractiveSession::is_terminal() {
+                run_interactive()
+            } else {
+                run_scan(cli.scan_args)
+            }
+        }
     }
 }
 
@@ -258,6 +279,15 @@ fn run_init(force: bool) -> i32 {
             EXIT_ERROR
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Interactive mode
+// ---------------------------------------------------------------------------
+
+fn run_interactive() -> i32 {
+    let mut session = crate::interactive::InteractiveSession::new();
+    session.run()
 }
 
 // ---------------------------------------------------------------------------
@@ -743,6 +773,48 @@ mod tests {
         assert!(overrides.min_confidence.is_none());
         assert!(!overrides.no_entropy);
         assert!(!overrides.no_cache);
+    }
+
+    #[test]
+    fn scan_args_is_default_when_no_flags() {
+        let args = default_scan_args();
+        assert!(args.is_default());
+    }
+
+    #[test]
+    fn scan_args_is_not_default_with_path() {
+        let args = ScanArgs {
+            path: Some(PathBuf::from("/tmp")),
+            ..default_scan_args()
+        };
+        assert!(!args.is_default());
+    }
+
+    #[test]
+    fn scan_args_is_not_default_with_verbose() {
+        let args = ScanArgs {
+            verbose: true,
+            ..default_scan_args()
+        };
+        assert!(!args.is_default());
+    }
+
+    #[test]
+    fn scan_args_is_not_default_with_clipboard() {
+        let args = ScanArgs {
+            clipboard: true,
+            ..default_scan_args()
+        };
+        assert!(!args.is_default());
+    }
+
+    #[test]
+    fn scan_args_is_not_default_with_browser() {
+        let args = ScanArgs {
+            browser: true,
+            ..default_scan_args()
+        };
+        assert!(!args.is_default());
     }
 
     #[test]
