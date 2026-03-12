@@ -38,6 +38,7 @@ use crate::models::{
 };
 use crate::reporting::html::HtmlReporter;
 use crate::reporting::json::JsonReporter;
+use crate::reporting::sarif::SarifReporter;
 use crate::reporting::terminal::TerminalReporter;
 
 // ---------------------------------------------------------------------------
@@ -116,7 +117,7 @@ struct ScanArgs {
     #[arg(value_name = "PATH")]
     path: Option<PathBuf>,
 
-    /// Output format [terminal|json|html]
+    /// Output format [terminal|json|html|sarif]
     #[arg(short, long, value_name = "FORMAT")]
     format: Option<String>,
 
@@ -163,7 +164,7 @@ struct ReportArgs {
     #[arg(value_name = "PATH")]
     path: PathBuf,
 
-    /// Output format [terminal|html|json]
+    /// Output format [terminal|html|json|sarif]
     #[arg(short, long, value_name = "FORMAT")]
     format: Option<String>,
 
@@ -193,9 +194,10 @@ impl ScanArgs {
                     "terminal" => ReportFormat::Terminal,
                     "json" => ReportFormat::Json,
                     "html" => ReportFormat::Html,
+                    "sarif" => ReportFormat::Sarif,
                     other => {
                         return Err(format!(
-                            "Unknown format '{other}': expected terminal, json, or html"
+                            "Unknown format '{other}': expected terminal, json, html, or sarif"
                         ))
                     }
                 };
@@ -287,8 +289,11 @@ fn run_report(args: ReportArgs) -> i32 {
             "terminal" => ReportFormat::Terminal,
             "json" => ReportFormat::Json,
             "html" => ReportFormat::Html,
+            "sarif" => ReportFormat::Sarif,
             other => {
-                eprintln!("sks error: Unknown format '{other}': expected terminal, json, or html");
+                eprintln!(
+                    "sks error: Unknown format '{other}': expected terminal, json, html, or sarif"
+                );
                 return EXIT_ERROR;
             }
         },
@@ -315,10 +320,7 @@ fn run_report(args: ReportArgs) -> i32 {
         ReportFormat::Terminal => Box::new(TerminalReporter),
         ReportFormat::Json => Box::new(JsonReporter),
         ReportFormat::Html => Box::new(HtmlReporter),
-        _ => {
-            eprintln!("sks error: format '{format:?}' is not supported for report");
-            return EXIT_ERROR;
-        }
+        ReportFormat::Sarif => Box::new(SarifReporter),
     };
 
     if let Err(e) = reporter.report(&result, &report_config) {
@@ -552,13 +554,7 @@ fn run_scan(args: ScanArgs) -> i32 {
         ReportFormat::Terminal => Box::new(TerminalReporter),
         ReportFormat::Json => Box::new(JsonReporter),
         ReportFormat::Html => Box::new(HtmlReporter),
-        _ => {
-            eprintln!(
-                "sks error: format '{:?}' is not yet supported; using terminal",
-                config.report.format
-            );
-            Box::new(TerminalReporter)
-        }
+        ReportFormat::Sarif => Box::new(SarifReporter),
     };
 
     if let Err(e) = reporter.report(&result, &config.report) {
