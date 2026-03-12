@@ -381,6 +381,7 @@ mod tests {
             exclude_paths: vec![],
             exclude_patterns: vec![],
             ignore_rules: crate::ignore::IgnoreRules::empty(),
+            enabled_sources: None,
         }
     }
 

@@ -48,6 +48,9 @@ pub struct ScanConfig {
     pub exclude_paths: Vec<PathBuf>,
     pub exclude_patterns: Vec<String>,
     pub ignore_rules: crate::ignore::IgnoreRules,
+    /// When `Some`, only collectors whose `source_type()` is in this list will run.
+    /// `None` means all available collectors run (the default for CLI usage).
+    pub enabled_sources: Option<Vec<crate::models::SourceType>>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +114,7 @@ impl Default for ScanConfig {
             exclude_paths: Vec::new(),
             exclude_patterns: Vec::new(),
             ignore_rules: crate::ignore::IgnoreRules::empty(),
+            enabled_sources: None,
         }
     }
 }

@@ -29,6 +29,7 @@ rusqlite = { version = "0.32", features = ["bundled"] } # read-only SQLite acces
 snap = "1" # Snappy decompression for Chrome LevelDB SSTables (localStorage extraction)
 dialoguer = "0.11" # Interactive terminal prompts (confirm, multi-select) for guided scan mode
 indicatif = "0.18" # Progress bars for interactive scan execution screen
+console = "0.16" # Terminal key reading for interactive results review (transitive dep of indicatif)
 
 [dev-dependencies]
 tempfile = "3" # temporary directories for LevelDB and other tests

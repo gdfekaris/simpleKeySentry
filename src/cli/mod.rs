@@ -397,10 +397,68 @@ fn run_scan(args: ScanArgs) -> i32 {
         config.scan.extra_paths.push(path.clone());
     }
 
-    // 3b. Load .sentryignore rules.
+    // 4. Capture bools before borrowing config mutably.
+    let quiet = config.report.verbosity == crate::config::Verbosity::Quiet;
+    let to_file = config.report.output_path.is_some();
+    let on_progress = move |msg: &str| {
+        if quiet || to_file {
+            return;
+        }
+        eprint!("\r\x1b[2K{msg}");
+        let _ = std::io::stderr().flush();
+    };
+
+    // 5. Run the scan pipeline.
+    let result = match execute_scan(&mut config, no_cache, &on_progress) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("sks error: {e}");
+            return EXIT_ERROR;
+        }
+    };
+
+    // Clear the progress line.
+    clear_progress(&config);
+
+    // 6. Report.
+    let has_findings = !result.findings.is_empty();
+    let reporter: Box<dyn Reporter> = match config.report.format {
+        ReportFormat::Terminal => Box::new(TerminalReporter),
+        ReportFormat::Json => Box::new(JsonReporter),
+        ReportFormat::Html => Box::new(HtmlReporter),
+        ReportFormat::Sarif => Box::new(SarifReporter),
+    };
+
+    if let Err(e) = reporter.report(&result, &config.report) {
+        eprintln!("sks error: {e}");
+        return EXIT_ERROR;
+    }
+
+    if has_findings {
+        EXIT_FINDINGS
+    } else {
+        EXIT_CLEAN
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Reusable scan pipeline (shared by run_scan and interactive mode)
+// ---------------------------------------------------------------------------
+
+/// Execute the scan pipeline: collectors → detection → filtering.
+///
+/// This is the core scan logic extracted from `run_scan()` so that interactive
+/// mode can reuse it. The `on_progress` closure receives status messages
+/// (e.g. "Scanning Shell History...") for UI display.
+pub fn execute_scan(
+    config: &mut SksConfig,
+    no_cache: bool,
+    on_progress: &dyn Fn(&str),
+) -> Result<ScanResult, crate::SksError> {
+    // Load .sentryignore rules.
     config.scan.ignore_rules = crate::ignore::IgnoreRules::load();
 
-    // 3c. Load incremental scanning cache.
+    // Load incremental scanning cache.
     let cache_file = cache::cache_path();
     let mut scan_cache = if no_cache {
         ScanCache::new()
@@ -408,15 +466,20 @@ fn run_scan(args: ScanArgs) -> i32 {
         ScanCache::load(&cache_file)
     };
 
-    // 4. Initialize collectors — check is_available() on each.
-    let collectors: Vec<Box<dyn Collector>> = available_collectors();
+    // Initialize collectors — check is_available() on each, then filter
+    // by enabled_sources if set.
+    let mut collectors: Vec<Box<dyn Collector>> = available_collectors();
+    if let Some(ref sources) = config.scan.enabled_sources {
+        collectors.retain(|c| sources.contains(&c.source_type()));
+    }
+
     let mut targets_scanned: Vec<SourceType> = Vec::new();
     for c in &collectors {
         targets_scanned.push(c.source_type());
     }
     targets_scanned.dedup_by(|a, b| std::mem::discriminant(a) == std::mem::discriminant(b));
 
-    // 5. Initialize detection engine.
+    // Initialize detection engine.
     let mut all_rules = all_patterns();
     let custom_result = match &config.rules_path {
         Some(path) => crate::detection::custom_rules::load_custom_rules_from(path),
@@ -425,7 +488,7 @@ fn run_scan(args: ScanArgs) -> i32 {
     match custom_result {
         Ok(custom) => {
             if !custom.is_empty() {
-                progress(&format!("Loaded {} custom rule(s)", custom.len()), &config);
+                on_progress(&format!("Loaded {} custom rule(s)", custom.len()));
                 all_rules.extend(custom);
             }
         }
@@ -451,25 +514,23 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     let started_at = Utc::now();
 
-    // 6. Run collectors — collector errors are non-fatal.
-    //    Items from cached (unchanged) files are filtered out.
+    // Run collectors — collector errors are non-fatal.
+    // Items from cached (unchanged) files are filtered out.
     let mut all_items: Vec<ContentItem> = Vec::new();
     let mut files_scanned: usize = 0;
     let mut files_cached: usize = 0;
 
     for collector in &collectors {
-        progress(&format!("Scanning {}...", collector.name()), &config);
+        on_progress(&format!("Scanning {}...", collector.name()));
         match collector.collect(&config.scan) {
             Ok(items) => {
                 if !items.is_empty() {
-                    // Collect unique paths from this collector.
                     let mut unique_paths: Vec<PathBuf> =
                         items.iter().map(|i| i.path.clone()).collect();
                     unique_paths.sort();
                     unique_paths.dedup();
                     let total_paths = unique_paths.len();
 
-                    // Determine which paths are stale (need re-scanning).
                     let stale_paths: std::collections::HashSet<PathBuf> = unique_paths
                         .into_iter()
                         .filter(|p| scan_cache.is_stale(p))
@@ -479,7 +540,6 @@ fn run_scan(args: ScanArgs) -> i32 {
                     files_scanned += total_paths;
                     files_cached += cached_count;
 
-                    // Only keep items from stale files.
                     let stale_items: Vec<ContentItem> = items
                         .into_iter()
                         .filter(|item| stale_paths.contains(&item.path))
@@ -495,7 +555,7 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     let bytes_scanned: u64 = all_items.iter().map(|i| i.line.len() as u64).sum();
 
-    // 6b. Collect direct findings (e.g., SSH permission checks).
+    // Collect direct findings (e.g., SSH permission checks).
     let mut direct_findings: Vec<Finding> = Vec::new();
     for collector in &collectors {
         match collector.direct_findings(&config.scan) {
@@ -506,19 +566,19 @@ fn run_scan(args: ScanArgs) -> i32 {
         }
     }
 
-    // 7. Run detection.
-    progress("Analyzing...", &config);
+    // Run detection.
+    on_progress("Analyzing...");
     let mut findings: Vec<Finding> = engine.analyze_batch(&all_items);
 
     // Merge direct findings so they go through the same filter/sort.
     findings.extend(direct_findings);
 
-    // 7b. Filter suppressed fingerprints from .sentryignore.
+    // Filter suppressed fingerprints from .sentryignore.
     let pre_suppress = findings.len();
     findings.retain(|f| !config.scan.ignore_rules.is_fingerprint_excluded(&f.id));
     let findings_suppressed = pre_suppress - findings.len();
 
-    // 8. Filter by min_confidence and sort.
+    // Filter by min_confidence and sort.
     findings.retain(|f| f.confidence >= config.detection.min_confidence);
     findings.sort_by(|a, b| {
         b.severity
@@ -527,16 +587,13 @@ fn run_scan(args: ScanArgs) -> i32 {
             .then_with(|| a.location.line.cmp(&b.location.line))
     });
 
-    // 8b. Update the incremental scanning cache.
+    // Update the incremental scanning cache.
     if !no_cache {
-        // Count findings per path from the filtered findings list.
         let mut findings_per_path: HashMap<&PathBuf, usize> = HashMap::new();
         for f in &findings {
             *findings_per_path.entry(&f.location.path).or_insert(0) += 1;
         }
 
-        // Update cache entries for all re-scanned files.
-        // Skip clipboard items — clipboard content must never be persisted.
         for item in &all_items {
             if crate::collectors::clipboard::is_clipboard_path(&item.path) {
                 continue;
@@ -560,12 +617,8 @@ fn run_scan(args: ScanArgs) -> i32 {
 
     let completed_at = Utc::now();
 
-    // Clear the progress line.
-    clear_progress(&config);
-
-    // 9. Build ScanResult.
-    let has_findings = !findings.is_empty();
-    let result = ScanResult {
+    // Build ScanResult.
+    Ok(ScanResult {
         findings,
         scan_metadata: ScanMetadata {
             started_at,
@@ -577,27 +630,7 @@ fn run_scan(args: ScanArgs) -> i32 {
             targets_scanned,
             sks_version: env!("CARGO_PKG_VERSION").to_string(),
         },
-    };
-
-    // 10. Report.
-    let reporter: Box<dyn Reporter> = match config.report.format {
-        ReportFormat::Terminal => Box::new(TerminalReporter),
-        ReportFormat::Json => Box::new(JsonReporter),
-        ReportFormat::Html => Box::new(HtmlReporter),
-        ReportFormat::Sarif => Box::new(SarifReporter),
-    };
-
-    if let Err(e) = reporter.report(&result, &config.report) {
-        eprintln!("sks error: {e}");
-        return EXIT_ERROR;
-    }
-
-    // Exit code.
-    if has_findings {
-        EXIT_FINDINGS
-    } else {
-        EXIT_CLEAN
-    }
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -711,21 +744,6 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
         .into_iter()
         .filter(|c| c.is_available())
         .collect()
-}
-
-/// Writes a progress message to stderr with a carriage return (overwrites
-/// the current line). Only shown when not in quiet mode and output is not
-/// to a file.
-fn progress(msg: &str, config: &SksConfig) {
-    use crate::config::Verbosity;
-    if config.report.verbosity == Verbosity::Quiet {
-        return;
-    }
-    if config.report.output_path.is_some() {
-        return;
-    }
-    eprint!("\r\x1b[2K{msg}");
-    let _ = std::io::stderr().flush();
 }
 
 /// Clears the progress line on stderr.
@@ -1140,5 +1158,54 @@ mod tests {
         assert_eq!(run_report(args), EXIT_CLEAN);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn execute_scan_returns_valid_result() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let mut config = SksConfig::default();
+        let called = AtomicBool::new(false);
+        let result = execute_scan(&mut config, true, &|_msg| {
+            called.store(true, Ordering::SeqCst);
+        });
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(!result.scan_metadata.sks_version.is_empty());
+        assert!(
+            called.load(Ordering::SeqCst),
+            "progress callback should be invoked"
+        );
+    }
+
+    #[test]
+    fn execute_scan_progress_callback_invoked() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let mut config = SksConfig::default();
+        let count = AtomicUsize::new(0);
+        let _ = execute_scan(&mut config, true, &|_msg| {
+            count.fetch_add(1, Ordering::SeqCst);
+        });
+        assert!(
+            count.load(Ordering::SeqCst) > 0,
+            "progress callback should be called at least once"
+        );
+    }
+
+    #[test]
+    fn execute_scan_enabled_sources_filters_collectors() {
+        let mut config = SksConfig::default();
+        // Only enable env files — should find no shell history targets.
+        config.scan.enabled_sources = Some(vec![SourceType::EnvFile]);
+        let result = execute_scan(&mut config, true, &|_| {}).unwrap();
+        // The only target scanned should be EnvFile (if the collector is available).
+        for st in &result.scan_metadata.targets_scanned {
+            assert_eq!(
+                *st,
+                SourceType::EnvFile,
+                "Only EnvFile should be in targets_scanned"
+            );
+        }
     }
 }
