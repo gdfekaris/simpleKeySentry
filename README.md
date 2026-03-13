@@ -1,6 +1,6 @@
 # simpleKeySentry (sks)
 
-## v0.2.0
+## v0.3.0
 
 A privacy-first local secrets scanner. Finds leaked credentials in shell history, dotfiles, cloud CLI configs, SSH keys, and environment files on your own machine — without sending anything off it.
 
@@ -14,6 +14,8 @@ A privacy-first local secrets scanner. Finds leaked credentials in shell history
 - **Cloud CLI configs** — AWS credentials/config, GCP application default credentials, Azure profile, Docker config, Kubernetes kubeconfig, GitHub CLI and Hub configs
 - **Application configs** — `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, `.my.cnf`, Cargo credentials, Gem credentials
 - **SSH keys** — unencrypted private keys, permissive file/directory permissions, authorized_keys audit, known_hosts plaintext hostnames
+- **Clipboard** (opt-in) — pasteboard contents and clipboard manager databases (Clipy, CopyQ, GPaste)
+- **Browser localStorage** (opt-in) — Chrome, Chromium, Brave, Edge (LevelDB), and Firefox (SQLite)
 
 ## What it detects
 
@@ -43,6 +45,8 @@ A privacy-first local secrets scanner. Finds leaked credentials in shell history
 
 Each match is scored with a confidence pipeline that combines regex pattern matching, Shannon entropy analysis, and 8 contextual heuristics to reduce false positives.
 
+You can also define custom detection rules in `~/.config/sks/rules.toml` or point to a custom file with `--rules-path`.
+
 ## Install
 
 Requires Rust 1.82+.
@@ -61,10 +65,10 @@ cp target/release/sks ~/.local/bin/sks
 ## Quick start
 
 ```bash
-# Run a scan with default settings
+# Run a scan (launches interactive mode in a TTY)
 sks
 
-# Same thing, explicitly
+# Non-interactive scan
 sks scan
 
 # Scan a specific directory
@@ -78,6 +82,9 @@ sks -f json
 
 # HTML report (self-contained, shareable)
 sks -f html -o report.html
+
+# SARIF output (for VS Code, GitHub code scanning, CI)
+sks -f sarif -o results.sarif
 
 # Write results to a file (created with 0600 permissions)
 sks -o report.json -f json
@@ -93,6 +100,18 @@ sks report report.json --format html -o report.html
 
 # Re-render a saved JSON report in the terminal
 sks report report.json
+
+# Scan only specific sources
+sks scan --sources shell,env
+
+# Include clipboard and browser (opt-in)
+sks scan --clipboard --browser
+
+# Use a custom rules file
+sks scan --rules-path ~/my-rules.toml
+
+# List all detection rules (built-in and custom)
+sks rules list
 ```
 
 ## Configuration
@@ -116,14 +135,18 @@ You can also place a `.sks.toml` in any project directory for project-specific s
 
 | Flag | Description |
 |---|---|
-| `-f, --format <FORMAT>` | Output format: `terminal` (default), `json`, or `html` |
+| `-f, --format <FORMAT>` | Output format: `terminal` (default), `json`, `html`, or `sarif` |
 | `-v, --verbose` | Show low and info-severity findings |
 | `-q, --quiet` | Show only the summary line |
 | `-o, --output <PATH>` | Write report to a file |
-| `--no-redact` | Show full secret values (use with caution) |
+| `--no-redact` | Show full secret values (use with caution; ignored for SARIF) |
 | `--min-confidence <N>` | Minimum confidence threshold, 0-100 (default: 30) |
 | `--no-entropy` | Disable entropy analysis |
 | `--no-cache` | Disable incremental scanning cache (force full scan) |
+| `--clipboard` | Scan clipboard contents (opt-in) |
+| `--browser` | Scan browser localStorage (opt-in) |
+| `--sources <LIST>` | Comma-separated sources to scan: `shell,dotfile,env,cloud,ssh,app,clipboard,browser` |
+| `--rules-path <PATH>` | Path to a custom rules TOML file |
 
 ## Incremental scanning
 
@@ -135,8 +158,11 @@ Use `--no-cache` to force a full scan.
 
 | Command | Description |
 |---|---|
-| `sks scan [PATH]` | Scan for secrets (default when no command is given) |
+| `sks` | Launch interactive mode (when run in a TTY with no flags) |
+| `sks scan [PATH]` | Scan for secrets |
 | `sks report <PATH>` | Re-render a saved JSON report in another format |
+| `sks rules list [--verbose]` | List all built-in and custom detection rules |
+| `sks rules test <REGEX>` | Test a regex pattern against stdin |
 | `sks init [--force]` | Create a default config file |
 
 ## Exit codes
@@ -159,7 +185,7 @@ The pipeline has three stages:
 
 1. **Collectors** read files and produce content items (lines with context)
 2. **Detection engine** matches patterns, computes entropy, applies heuristics, and scores each finding
-3. **Reporters** format the output for humans (terminal), machines (JSON), or sharing (HTML)
+3. **Reporters** format the output for humans (terminal), machines (JSON), sharing (HTML), or IDE/CI integration (SARIF)
 
 Confidence scoring: `base_confidence + entropy_delta + sum(heuristic_deltas)`, clamped to [0.0, 1.0]. Severity is derived from the final score:
 
@@ -172,6 +198,37 @@ Confidence scoring: `base_confidence + entropy_delta + sum(heuristic_deltas)`, c
 | 0-29% | Info |
 
 By default, only Medium and above are shown. Use `-v` to see everything.
+
+## Suppressing findings
+
+Create a `.sentryignore` file in your project directory to suppress known false positives. Each line is a `sha256:...` fingerprint (shown in scan output) or a glob pattern for path exclusions:
+
+```
+# Ignore a specific finding by fingerprint
+sha256:abc123...
+
+# Ignore all findings in test fixtures
+tests/fixtures/**
+```
+
+## Custom rules
+
+Define additional detection patterns in `~/.config/sks/rules.toml`:
+
+```toml
+[[rules]]
+name = "internal-api-key"
+description = "Internal API key pattern"
+regex = 'INTERNAL_[A-Z]+_KEY\s*=\s*["\']?([A-Za-z0-9]{32,})'
+base_confidence = 0.7
+remediation = "Rotate the internal API key and use a secrets manager"
+```
+
+Or point to a different file with `--rules-path`. Use `sks rules list` to see all active rules.
+
+## Interactive mode
+
+Running bare `sks` in a terminal launches an interactive guided scan. It walks you through target selection, runs the scan with a progress spinner, lets you review findings one at a time with keyboard navigation, and offers to save an HTML report.
 
 ## Privacy and security
 
