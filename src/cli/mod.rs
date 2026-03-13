@@ -156,6 +156,15 @@ struct ScanArgs {
     /// Scan browser localStorage (opt-in, privacy-sensitive)
     #[arg(long)]
     browser: bool,
+
+    /// Path to custom rules TOML file
+    #[arg(long, value_name = "PATH")]
+    rules_path: Option<PathBuf>,
+
+    /// Comma-separated sources to scan
+    /// [shell,dotfile,env,cloud,ssh,app,clipboard,browser]
+    #[arg(long, value_name = "LIST", value_delimiter = ',')]
+    sources: Option<Vec<String>>,
 }
 
 #[derive(Parser, Clone)]
@@ -199,6 +208,8 @@ impl ScanArgs {
             && !self.no_cache
             && !self.clipboard
             && !self.browser
+            && self.rules_path.is_none()
+            && self.sources.is_none()
     }
 
     /// Convert parsed CLI arguments into a `CliOverrides` struct.
@@ -226,6 +237,17 @@ impl ScanArgs {
             f64::from(clamped) / 100.0
         });
 
+        let enabled_sources = match &self.sources {
+            Some(names) => {
+                let mut types = Vec::new();
+                for name in names {
+                    types.push(parse_cli_source(name)?);
+                }
+                Some(types)
+            }
+            None => None,
+        };
+
         Ok(CliOverrides {
             format,
             verbose: self.verbose,
@@ -237,6 +259,11 @@ impl ScanArgs {
             no_cache: self.no_cache,
             clipboard: if self.clipboard { Some(true) } else { None },
             browser: if self.browser { Some(true) } else { None },
+            rules_path: self
+                .rules_path
+                .as_ref()
+                .map(|p| crate::config::tilde_expand(&p.to_string_lossy())),
+            enabled_sources,
         })
     }
 }
@@ -345,6 +372,13 @@ fn run_report(args: ReportArgs) -> i32 {
         output_path: args.output,
     };
 
+    if format == ReportFormat::Sarif && !report_config.redact {
+        eprintln!(
+            "sks warn: SARIF format always redacts secrets; \
+             --no-redact is ignored for SARIF output"
+        );
+    }
+
     // 4. Invoke reporter.
     let reporter: Box<dyn crate::models::Reporter> = match format {
         ReportFormat::Terminal => Box::new(TerminalReporter),
@@ -391,6 +425,13 @@ fn run_scan(args: ScanArgs) -> i32 {
     // 3. Apply CLI overrides (highest priority).
     let no_cache = overrides.no_cache;
     config.apply_overrides(&overrides);
+
+    if config.report.format == ReportFormat::Sarif && !config.report.redact {
+        eprintln!(
+            "sks warn: SARIF format always redacts secrets; \
+             --no-redact is ignored for SARIF output"
+        );
+    }
 
     // If a specific PATH was given, add it to extra_paths.
     if let Some(path) = &args.path {
@@ -726,6 +767,23 @@ fn run_rules_test(pattern: &str) -> i32 {
 // Helpers
 // ---------------------------------------------------------------------------
 
+fn parse_cli_source(s: &str) -> Result<SourceType, String> {
+    match s.to_lowercase().as_str() {
+        "shell" => Ok(SourceType::ShellHistory),
+        "dotfile" => Ok(SourceType::Dotfile),
+        "env" => Ok(SourceType::EnvFile),
+        "cloud" => Ok(SourceType::CloudConfig),
+        "ssh" => Ok(SourceType::SshKey),
+        "app" => Ok(SourceType::ApplicationConfig),
+        "clipboard" => Ok(SourceType::Clipboard),
+        "browser" => Ok(SourceType::BrowserStorage),
+        other => Err(format!(
+            "Unknown source '{other}': expected one of \
+             shell, dotfile, env, cloud, ssh, app, clipboard, browser"
+        )),
+    }
+}
+
 /// Returns all collectors that are available on this system.
 fn available_collectors() -> Vec<Box<dyn Collector>> {
     let candidates: Vec<Box<dyn Collector>> = vec![
@@ -769,19 +827,7 @@ mod tests {
 
     #[test]
     fn scan_args_default_produces_no_overrides() {
-        let args = ScanArgs {
-            path: None,
-            format: None,
-            verbose: false,
-            quiet: false,
-            output: None,
-            no_redact: false,
-            min_confidence: None,
-            no_entropy: false,
-            no_cache: false,
-            clipboard: false,
-            browser: false,
-        };
+        let args = default_scan_args();
         let overrides = args.to_overrides().unwrap();
         assert!(overrides.format.is_none());
         assert!(!overrides.verbose);
@@ -984,6 +1030,8 @@ mod tests {
             no_cache: false,
             clipboard: false,
             browser: false,
+            rules_path: None,
+            sources: None,
         }
     }
 
@@ -1207,5 +1255,104 @@ mod tests {
                 "Only EnvFile should be in targets_scanned"
             );
         }
+    }
+
+    #[test]
+    fn parse_cli_source_valid_values() {
+        assert_eq!(parse_cli_source("shell").unwrap(), SourceType::ShellHistory);
+        assert_eq!(parse_cli_source("dotfile").unwrap(), SourceType::Dotfile);
+        assert_eq!(parse_cli_source("env").unwrap(), SourceType::EnvFile);
+        assert_eq!(parse_cli_source("cloud").unwrap(), SourceType::CloudConfig);
+        assert_eq!(parse_cli_source("ssh").unwrap(), SourceType::SshKey);
+        assert_eq!(
+            parse_cli_source("app").unwrap(),
+            SourceType::ApplicationConfig
+        );
+        assert_eq!(
+            parse_cli_source("clipboard").unwrap(),
+            SourceType::Clipboard
+        );
+        assert_eq!(
+            parse_cli_source("browser").unwrap(),
+            SourceType::BrowserStorage
+        );
+    }
+
+    #[test]
+    fn parse_cli_source_case_insensitive() {
+        assert_eq!(parse_cli_source("SHELL").unwrap(), SourceType::ShellHistory);
+        assert_eq!(parse_cli_source("Shell").unwrap(), SourceType::ShellHistory);
+    }
+
+    #[test]
+    fn parse_cli_source_invalid_returns_error() {
+        let result = parse_cli_source("invalid");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unknown source"));
+    }
+
+    #[test]
+    fn scan_args_sources_single() {
+        let args = ScanArgs {
+            sources: Some(vec!["shell".to_string()]),
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        let sources = overrides.enabled_sources.unwrap();
+        assert_eq!(sources, vec![SourceType::ShellHistory]);
+    }
+
+    #[test]
+    fn scan_args_sources_multiple() {
+        let args = ScanArgs {
+            sources: Some(vec!["shell".to_string(), "env".to_string()]),
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        let sources = overrides.enabled_sources.unwrap();
+        assert_eq!(sources, vec![SourceType::ShellHistory, SourceType::EnvFile]);
+    }
+
+    #[test]
+    fn scan_args_sources_invalid_returns_error() {
+        let args = ScanArgs {
+            sources: Some(vec!["shell".to_string(), "bogus".to_string()]),
+            ..default_scan_args()
+        };
+        assert!(args.to_overrides().is_err());
+    }
+
+    #[test]
+    fn scan_args_rules_path_passthrough() {
+        let args = ScanArgs {
+            rules_path: Some(PathBuf::from("/tmp/rules.toml")),
+            ..default_scan_args()
+        };
+        let overrides = args.to_overrides().unwrap();
+        assert_eq!(overrides.rules_path, Some(PathBuf::from("/tmp/rules.toml")));
+    }
+
+    #[test]
+    fn scan_args_is_default_with_sources_is_false() {
+        let args = ScanArgs {
+            sources: Some(vec!["shell".to_string()]),
+            ..default_scan_args()
+        };
+        assert!(!args.is_default());
+    }
+
+    #[test]
+    fn scan_args_is_default_with_rules_path_is_false() {
+        let args = ScanArgs {
+            rules_path: Some(PathBuf::from("/tmp/rules.toml")),
+            ..default_scan_args()
+        };
+        assert!(!args.is_default());
+    }
+
+    #[test]
+    fn scan_args_is_default_still_true() {
+        let args = default_scan_args();
+        assert!(args.is_default());
     }
 }

@@ -95,6 +95,8 @@ pub struct CliOverrides {
     pub no_cache: bool,
     pub clipboard: Option<bool>,
     pub browser: Option<bool>,
+    pub rules_path: Option<PathBuf>,
+    pub enabled_sources: Option<Vec<crate::models::SourceType>>,
 }
 
 // ─── Default implementations ──────────────────────────────────────────────────
@@ -229,6 +231,19 @@ impl SksConfig {
         }
         if let Some(browser) = overrides.browser {
             self.scan.browser = browser;
+        }
+        if let Some(path) = &overrides.rules_path {
+            self.rules_path = Some(path.clone());
+        }
+        if let Some(ref sources) = overrides.enabled_sources {
+            self.scan.enabled_sources = Some(sources.clone());
+            // Auto-enable opt-in collectors when selected via --sources
+            if sources.contains(&crate::models::SourceType::Clipboard) {
+                self.scan.clipboard = true;
+            }
+            if sources.contains(&crate::models::SourceType::BrowserStorage) {
+                self.scan.browser = true;
+            }
         }
     }
 }
@@ -732,5 +747,73 @@ mod tests {
             "user config path should contain 'sks': {}",
             path_str
         );
+    }
+
+    #[test]
+    fn apply_overrides_rules_path() {
+        let mut config = SksConfig::default();
+        let overrides = CliOverrides {
+            rules_path: Some(PathBuf::from("/tmp/custom_rules.toml")),
+            ..Default::default()
+        };
+        config.apply_overrides(&overrides);
+        assert_eq!(
+            config.rules_path,
+            Some(PathBuf::from("/tmp/custom_rules.toml"))
+        );
+    }
+
+    #[test]
+    fn apply_overrides_enabled_sources() {
+        use crate::models::SourceType;
+        let mut config = SksConfig::default();
+        let overrides = CliOverrides {
+            enabled_sources: Some(vec![SourceType::ShellHistory, SourceType::EnvFile]),
+            ..Default::default()
+        };
+        config.apply_overrides(&overrides);
+        let sources = config.scan.enabled_sources.unwrap();
+        assert_eq!(sources.len(), 2);
+        assert!(sources.contains(&SourceType::ShellHistory));
+        assert!(sources.contains(&SourceType::EnvFile));
+    }
+
+    #[test]
+    fn apply_overrides_sources_clipboard_auto_enables() {
+        use crate::models::SourceType;
+        let mut config = SksConfig::default();
+        assert!(!config.scan.clipboard);
+        let overrides = CliOverrides {
+            enabled_sources: Some(vec![SourceType::Clipboard]),
+            ..Default::default()
+        };
+        config.apply_overrides(&overrides);
+        assert!(config.scan.clipboard);
+    }
+
+    #[test]
+    fn apply_overrides_sources_browser_auto_enables() {
+        use crate::models::SourceType;
+        let mut config = SksConfig::default();
+        assert!(!config.scan.browser);
+        let overrides = CliOverrides {
+            enabled_sources: Some(vec![SourceType::BrowserStorage]),
+            ..Default::default()
+        };
+        config.apply_overrides(&overrides);
+        assert!(config.scan.browser);
+    }
+
+    #[test]
+    fn apply_overrides_sources_without_optin_no_auto_enable() {
+        use crate::models::SourceType;
+        let mut config = SksConfig::default();
+        let overrides = CliOverrides {
+            enabled_sources: Some(vec![SourceType::ShellHistory, SourceType::Dotfile]),
+            ..Default::default()
+        };
+        config.apply_overrides(&overrides);
+        assert!(!config.scan.clipboard);
+        assert!(!config.scan.browser);
     }
 }
