@@ -24,6 +24,10 @@ pub enum SecretType {
     DatabaseUrl,
     GenericApiKey,
     GenericHighEntropy,
+    /// Bitcoin private key material — extended private keys (xprv/yprv/zprv/tprv)
+    /// or WIF-encoded single keys. Possession allows immediate, irreversible
+    /// theft of all funds derivable from the key.
+    BitcoinPrivateKey,
     /// User-defined rule (populated in later phases via custom TOML rules).
     Custom(String),
 }

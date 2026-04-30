@@ -1,0 +1,14 @@
+# Bitcoin WIF false positives — must NOT match.
+#
+# Same shape as a real WIF (correct leading character, correct length,
+# all base58 characters) but with a broken trailing checksum. The regex
+# accepts these; the validator rejects them.
+
+# Uncompressed WIF with last char swapped (J → K)
+5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTK
+
+# Compressed WIF with last char swapped (7 → 8)
+KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98618
+
+# Uncompressed WIF with a middle char swapped
+5HueCGU8rMjxEXxiPuD5BDku5MkFqeZyd4dZ1jvhTVqvbTLvyTJ

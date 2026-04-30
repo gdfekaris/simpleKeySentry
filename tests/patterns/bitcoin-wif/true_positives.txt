@@ -1,0 +1,15 @@
+# Bitcoin WIF private keys — must match (regex first-pass + base58check
+# validator + mainnet 0x80 version byte + 33-byte uncompressed payload or
+# 34-byte compressed payload with trailing 0x01 flag).
+#
+# Both compression encodings are exercised. Testnet WIFs (leading `9` /
+# `c`) are intentionally excluded by the regex character class `[KL5]`
+# and so are not represented here.
+
+# Canonical mainnet uncompressed WIF (Bitcoin Wiki test vector)
+# 33-byte payload: 0x80 + 32-byte private key
+5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ
+
+# Canonical mainnet compressed WIF (Bitcoin Wiki test vector)
+# 34-byte payload: 0x80 + 32-byte private key + 0x01 compression flag
+KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617

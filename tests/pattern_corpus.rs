@@ -14,6 +14,32 @@ fn corpus_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/patterns")
 }
 
+/// True if `line` would survive the engine's full match → validator gate.
+///
+/// Mirrors `DetectionEngine::analyze`: a candidate is "matched" only when
+/// the regex hits *and* (if present) the rule's validator accepts the
+/// captured value. This lets corpus FPs include same-shape strings with
+/// broken checksums for validator-gated patterns (e.g. Bitcoin xprv/WIF):
+/// they pass the regex but the validator rejects them, so the engine
+/// would emit no Finding.
+fn matches_with_validator(compiled: &CompiledPattern, line: &str) -> bool {
+    let Some(captures) = compiled.regex.captures(line) else {
+        return false;
+    };
+    let value = captures
+        .get(1)
+        .or_else(|| captures.get(0))
+        .map(|m| m.as_str())
+        .unwrap_or("");
+    if value.is_empty() {
+        return false;
+    }
+    if let Some(validate) = compiled.rule.validator {
+        return validate(value);
+    }
+    true
+}
+
 fn run_corpus_test(name: &str) {
     let rule = all_patterns()
         .into_iter()
@@ -25,7 +51,7 @@ fn run_corpus_test(name: &str) {
 
     let base = corpus_dir().join(name);
 
-    // ── true positives (must match) ──────────────────────────────────────────
+    // ── true positives (must match end-to-end: regex + validator) ───────────
     let tp_path = base.join("true_positives.txt");
     let tp_content = std::fs::read_to_string(&tp_path)
         .unwrap_or_else(|_| panic!("Missing true_positives.txt for '{}'", name));
@@ -36,14 +62,14 @@ fn run_corpus_test(name: &str) {
             continue;
         }
         assert!(
-            compiled.regex.is_match(line),
+            matches_with_validator(&compiled, line),
             "Pattern '{}' should match (true positive): {:?}",
             name,
             line
         );
     }
 
-    // ── false positives (must NOT match) ─────────────────────────────────────
+    // ── false positives (must NOT match end-to-end) ─────────────────────────
     let fp_path = base.join("false_positives.txt");
     let fp_content = std::fs::read_to_string(&fp_path)
         .unwrap_or_else(|_| panic!("Missing false_positives.txt for '{}'", name));
@@ -54,7 +80,7 @@ fn run_corpus_test(name: &str) {
             continue;
         }
         assert!(
-            !compiled.regex.is_match(line),
+            !matches_with_validator(&compiled, line),
             "Pattern '{}' should NOT match (false positive): {:?}",
             name,
             line
@@ -276,12 +302,26 @@ fn corpus_basic_auth_url() {
     run_corpus_test("basic-auth-url");
 }
 
-/// Sanity check: all 42 patterns compile successfully from a single RegexSet.
+// =========================================================================
+// Bitcoin MVP — Block B (extended private keys + WIF)
+// =========================================================================
+
+#[test]
+fn corpus_bitcoin_xprv() {
+    run_corpus_test("bitcoin-xprv");
+}
+
+#[test]
+fn corpus_bitcoin_wif() {
+    run_corpus_test("bitcoin-wif");
+}
+
+/// Sanity check: all 44 patterns compile successfully from a single RegexSet.
 #[test]
 fn all_patterns_compile_in_regex_set() {
     use regex::RegexSet;
     let patterns = all_patterns();
-    assert_eq!(patterns.len(), 42, "Expected exactly 42 patterns");
+    assert_eq!(patterns.len(), 44, "Expected exactly 44 patterns");
     let regexes: Vec<&str> = patterns.iter().map(|p| p.regex.as_str()).collect();
     RegexSet::new(&regexes).expect("One or more patterns failed to compile in RegexSet");
 }

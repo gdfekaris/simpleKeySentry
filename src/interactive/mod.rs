@@ -183,6 +183,9 @@ pub fn secret_type_explanation(st: &SecretType) -> &'static str {
         SecretType::GenericHighEntropy => {
             "A high-entropy string that looks like it could be a secret or credential."
         }
+        SecretType::BitcoinPrivateKey => {
+            "A Bitcoin private key. Possession allows immediate, irreversible theft of all funds derivable from this key. Sweep funds to a freshly generated wallet — do not reuse this key."
+        }
         SecretType::Custom(_) => "A secret matched by a user-defined detection rule.",
     }
 }
@@ -255,6 +258,7 @@ fn print_finding(finding: &Finding, index: usize, total: usize) {
             SecretType::DatabaseUrl => "Database URL",
             SecretType::GenericApiKey => "API Key",
             SecretType::GenericHighEntropy => "High-Entropy Secret",
+            SecretType::BitcoinPrivateKey => "Bitcoin Private Key",
             SecretType::Custom(_) => unreachable!(),
         },
     };

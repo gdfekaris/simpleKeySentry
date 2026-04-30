@@ -476,6 +476,6 @@ remediation = "rotate"
     #[test]
     fn rules_list_shows_builtin_count() {
         let patterns = crate::detection::patterns::all_patterns();
-        assert_eq!(patterns.len(), 42, "expected 42 built-in patterns");
+        assert_eq!(patterns.len(), 44, "expected 44 built-in patterns");
     }
 }

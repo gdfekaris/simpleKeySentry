@@ -1,0 +1,27 @@
+# Bitcoin extended private key false positives — must NOT match.
+#
+# These strings have the *exact* shape of a real xprv/yprv/zprv/tprv
+# (correct prefix, correct length, all base58 characters) but the trailing
+# 4-byte checksum is wrong. The regex first-pass accepts them; the
+# base58check validator rejects them. This is the entire reason the
+# validator exists — without it, the regex alone would emit Findings on
+# any 111-character base58 string starting with `xprv`.
+#
+# Each entry is constructed by taking a true positive and swapping a
+# single character; the SHA-256d checksum collision rate is ~1/2^32, so
+# mutation reliably breaks the checksum.
+
+# xprv with last char swapped (i → j)
+xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHj
+
+# xprv with a middle char swapped (Q → R near the start of the body)
+xprv9s21ZrRH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi
+
+# yprv with last char swapped (t → u)
+yprvABrGsX5C9jantheLAR8A97LcTCTVsvThwu2FZpdxFtyH2CS4JPYxToNLixTWvGygnuRmFxVEZ18ny3GJ57nPGH8skkt4tbZXKhxuaUFh6ju
+
+# zprv with last char swapped (v → w)
+zprvAWgYBBk7JR8GjzqSzmunMCS7dAbwpYTCs1YUMDXqduMA5JFHZ3iX5s2UkAR6vBdcCYYa1S5o1fVLrKsrnpCQ4WpUd6aVUWP1bS2Yy5DoaKw
+
+# tprv with last char swapped (m → n)
+tprv8ZgxMBicQKsPeDgjzdC36fs6bMjGApWDNLR9erAXMs5skhMv36j9MV5ecvfavji5khqjWaWSFhN3YcCUUdiKH6isR4Pwy3U5y5egddBr16n

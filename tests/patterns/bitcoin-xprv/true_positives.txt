@@ -1,0 +1,28 @@
+# Bitcoin extended private keys — must match (regex first-pass + base58check
+# validator + 78-byte payload + recognised version bytes + 0x00 private-key
+# prefix byte at offset 45).
+#
+# All four supported variants are exercised:
+#   xprv  — BIP-44 mainnet  (version 0x0488ADE4)
+#   yprv  — BIP-49 mainnet  (version 0x049D7878)
+#   zprv  — BIP-84 mainnet  (version 0x04B2430C)
+#   tprv  — BIP-32 testnet  (version 0x04358394)
+#
+# The xprv vector is BIP-32 test vector 1 master. The yprv/zprv/tprv vectors
+# are derived deterministically from that same 78-byte payload by swapping
+# the 4-byte version prefix and recomputing the trailing checksum (see
+# `synth_xprv` in src/detection/bitcoin.rs tests). They are not test
+# vectors from the originating BIPs; they are valid by construction and
+# exercise the version-byte allow-list.
+
+# xprv — BIP-32 test vector 1 master (mainnet)
+xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi
+
+# yprv — synthesized BIP-49 mainnet
+yprvABrGsX5C9jantheLAR8A97LcTCTVsvThwu2FZpdxFtyH2CS4JPYxToNLixTWvGygnuRmFxVEZ18ny3GJ57nPGH8skkt4tbZXKhxuaUFh6jt
+
+# zprv — synthesized BIP-84 mainnet
+zprvAWgYBBk7JR8GjzqSzmunMCS7dAbwpYTCs1YUMDXqduMA5JFHZ3iX5s2UkAR6vBdcCYYa1S5o1fVLrKsrnpCQ4WpUd6aVUWP1bS2Yy5DoaKv
+
+# tprv — synthesized BIP-32 testnet
+tprv8ZgxMBicQKsPeDgjzdC36fs6bMjGApWDNLR9erAXMs5skhMv36j9MV5ecvfavji5khqjWaWSFhN3YcCUUdiKH6isR4Pwy3U5y5egddBr16m

@@ -80,6 +80,7 @@ fn secret_type_label(st: &crate::models::SecretType) -> &str {
         DatabaseUrl => "database-url",
         GenericApiKey => "generic-api-key",
         GenericHighEntropy => "generic-high-entropy",
+        BitcoinPrivateKey => "bitcoin-private-key",
         Custom(name) => name.as_str(),
     }
 }

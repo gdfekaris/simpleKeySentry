@@ -45,6 +45,7 @@ fn secret_type_str(st: &crate::models::SecretType) -> String {
         DatabaseUrl => "database-url".into(),
         GenericApiKey => "generic-api-key".into(),
         GenericHighEntropy => "generic-high-entropy".into(),
+        BitcoinPrivateKey => "bitcoin-private-key".into(),
         Custom(name) => name.clone(),
     }
 }

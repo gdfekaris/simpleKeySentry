@@ -1,3 +1,4 @@
+use crate::detection::bitcoin::{validate_wif, validate_xprv};
 use crate::detection::PatternRule;
 use crate::models::SecretType;
 
@@ -521,6 +522,52 @@ pub fn all_patterns() -> Vec<PatternRule> {
                 "Move credentials out of URLs and into environment variables or a secrets manager."
                     .to_string(),
             validator: None,
+        },
+        // =====================================================================
+        // Bitcoin MVP — Block B (extended private keys + WIF)
+        //
+        // Both patterns gate on a base58check + version-byte validator. The
+        // regex first-pass is a cheap shape filter; the validator is the
+        // hard gate that drops candidates with broken checksums or wrong
+        // payload shape before any confidence math runs.
+        //
+        // Severity is deliberately Critical (base 1.0). Bitcoin private-key
+        // exposure is immediately and irreversibly theft-relevant — no
+        // entropy or context heuristic should ever lower it below
+        // Critical, and the validator already eliminates the FP modes
+        // those heuristics exist to mitigate.
+        //
+        // Remediation language is Bitcoin-specific. Generic "rotate the
+        // key" advice is *wrong* for Bitcoin: there is no issuer to
+        // revoke against. Funds must be swept to a freshly generated
+        // wallet, and the exposed key must never be reused.
+        // =====================================================================
+        // 43 ── Bitcoin Extended Private Key (xprv / yprv / zprv / tprv)
+        PatternRule {
+            name: "bitcoin-xprv".to_string(),
+            description: "Bitcoin Extended Private Key".to_string(),
+            regex: r"((?:[xyz]prv|tprv)[1-9A-HJ-NP-Za-km-z]{107,108})".to_string(),
+            secret_type: SecretType::BitcoinPrivateKey,
+            base_confidence: 1.0,
+            remediation:
+                "Generate a new wallet on a clean, offline device and sweep all funds from every \
+                 account derived under this xprv to it. Treat every address ever derived from \
+                 this key as compromised forever — do not import this xprv into any new wallet."
+                    .to_string(),
+            validator: Some(validate_xprv),
+        },
+        // 44 ── Bitcoin WIF Private Key (mainnet, compressed and uncompressed)
+        PatternRule {
+            name: "bitcoin-wif".to_string(),
+            description: "Bitcoin WIF Private Key".to_string(),
+            regex: r"([KL5][1-9A-HJ-NP-Za-km-z]{50,51})".to_string(),
+            secret_type: SecretType::BitcoinPrivateKey,
+            base_confidence: 1.0,
+            remediation:
+                "Sweep all funds from this address to a freshly generated wallet. Do not reuse \
+                 this key — Bitcoin keys cannot be rotated, only abandoned."
+                    .to_string(),
+            validator: Some(validate_wif),
         },
     ]
 }
