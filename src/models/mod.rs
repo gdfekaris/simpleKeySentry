@@ -28,6 +28,16 @@ pub enum SecretType {
     /// or WIF-encoded single keys. Possession allows immediate, irreversible
     /// theft of all funds derivable from the key.
     BitcoinPrivateKey,
+    /// Bitcoin seed phrase — a BIP-39 mnemonic. The seed deterministically
+    /// derives every key in the wallet, so possession allows immediate,
+    /// irreversible theft of all funds across every account ever derived
+    /// from this seed.
+    BitcoinSeed,
+    /// Lightning Network secret material — Core Lightning `hsm_secret`,
+    /// LND `admin.macaroon`, or LND `wallet.db`. These artifacts grant
+    /// full custody or full node control; possession of `hsm_secret` or
+    /// `admin.macaroon` is immediately and irreversibly theft-relevant.
+    LightningSecret,
     /// User-defined rule (populated in later phases via custom TOML rules).
     Custom(String),
 }
@@ -81,6 +91,10 @@ pub enum SourceType {
     ApplicationConfig,
     Clipboard,
     BrowserStorage,
+    /// Bitcoin / Lightning data directories (`~/.lightning/`, `~/.lnd/`).
+    /// Findings here are file-presence: possession of the listed artifact
+    /// is itself the compromise.
+    Bitcoin,
 }
 
 // ---------------------------------------------------------------------------

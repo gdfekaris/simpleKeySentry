@@ -46,6 +46,8 @@ fn secret_type_str(st: &crate::models::SecretType) -> String {
         GenericApiKey => "generic-api-key".into(),
         GenericHighEntropy => "generic-high-entropy".into(),
         BitcoinPrivateKey => "bitcoin-private-key".into(),
+        BitcoinSeed => "bitcoin-seed".into(),
+        LightningSecret => "lightning-secret".into(),
         Custom(name) => name.clone(),
     }
 }
@@ -61,6 +63,7 @@ fn source_type_str(st: &crate::models::SourceType) -> &'static str {
         ApplicationConfig => "app_config",
         Clipboard => "clipboard",
         BrowserStorage => "browser_storage",
+        Bitcoin => "bitcoin",
     }
 }
 
@@ -159,6 +162,9 @@ fn parse_secret_type(s: &str) -> SecretType {
         "database-url" => SecretType::DatabaseUrl,
         "generic-api-key" => SecretType::GenericApiKey,
         "generic-high-entropy" => SecretType::GenericHighEntropy,
+        "bitcoin-private-key" => SecretType::BitcoinPrivateKey,
+        "bitcoin-seed" => SecretType::BitcoinSeed,
+        "lightning-secret" => SecretType::LightningSecret,
         other => SecretType::Custom(other.to_string()),
     }
 }
@@ -173,6 +179,7 @@ fn parse_source_type(s: &str) -> Result<SourceType, SksError> {
         "app_config" => Ok(SourceType::ApplicationConfig),
         "clipboard" => Ok(SourceType::Clipboard),
         "browser_storage" => Ok(SourceType::BrowserStorage),
+        "bitcoin" => Ok(SourceType::Bitcoin),
         other => Err(SksError::Report(format!("Unknown source type: {other}"))),
     }
 }

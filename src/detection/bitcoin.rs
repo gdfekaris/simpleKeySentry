@@ -1,14 +1,16 @@
 //! Bitcoin-specific validation primitives.
 //!
-//! This module hosts the building blocks used by Bitcoin pattern validators.
-//! Block A ships the base58check decoder, which is enough to validate
-//! extended private keys (`xprv`/`yprv`/`zprv`/`tprv`) and WIF private keys
-//! at the format level. BIP-39 mnemonic validation will land here in
-//! Block C.
+//! This module hosts the building blocks used by Bitcoin pattern validators:
+//! a base58check decoder used by extended-key and WIF validators, and a
+//! BIP-39 English mnemonic validator that re-derives and verifies the
+//! mnemonic's embedded checksum.
 //!
 //! All routines are pure functions: no I/O, no global state, no panics on
 //! adversarial input. Allocations are short-lived and proportional to input
 //! size.
+
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use sha2::{Digest, Sha256};
 
@@ -154,6 +156,101 @@ pub fn validate_wif(s: &str) -> bool {
         34 => payload[33] == 0x01, // compressed: trailing flag must be 0x01
         _ => false,
     }
+}
+
+// ---------------------------------------------------------------------------
+// BIP-39 English mnemonic validation
+// ---------------------------------------------------------------------------
+
+/// Official BIP-39 English wordlist, embedded at compile time. The file is
+/// the canonical 2048-line list published by the BIP-39 reference (SHA-256
+/// `2f5eed53a4727b4bf8880d8f3f199efc90e58503646d9ff8eff3a2ed3b24dbda`).
+const BIP39_ENGLISH_RAW: &str = include_str!("bip39_english.txt");
+
+/// Word → 11-bit index lookup, built once on first use. The wordlist is fixed
+/// at 2048 entries; indices fit in `u16`.
+static BIP39_ENGLISH: LazyLock<HashMap<&'static str, u16>> = LazyLock::new(|| {
+    BIP39_ENGLISH_RAW
+        .lines()
+        .enumerate()
+        .map(|(i, w)| (w, i as u16))
+        .collect()
+});
+
+/// Validate a BIP-39 English mnemonic by re-deriving its checksum.
+///
+/// Accepts only 12- or 24-word mnemonics whose tokens are all members of the
+/// official BIP-39 English wordlist *and* whose trailing checksum bits match
+/// `SHA-256(entropy)`. 15/18/21-word mnemonics are valid BIP-39 but are
+/// deliberately out of scope for the MVP; nearly all real-world self-custody
+/// seeds are 12 or 24 words, and restricting to those two lengths cuts
+/// false-positive volume on prose substantially.
+///
+/// The function is case-sensitive: the wordlist is lowercase, so any
+/// uppercase token fails the lookup. The pattern regex enforces the same
+/// restriction at the first-pass layer.
+///
+/// # Algorithm
+///
+/// 1. Tokenize on ASCII whitespace.
+/// 2. Reject if word count is not 12 or 24.
+/// 3. Map each word → 11-bit index via the wordlist; reject on miss.
+/// 4. Pack indices big-endian into a 132-bit (12-word) or 264-bit (24-word)
+///    bitstream.
+/// 5. Split into entropy (128/256 bits) and checksum (4/8 bits).
+/// 6. Compute `SHA-256(entropy)` and compare its top `checksum_bits` bits
+///    against the trailing checksum bits.
+pub fn validate_bip39_english(s: &str) -> bool {
+    let tokens: Vec<&str> = s.split_ascii_whitespace().collect();
+    let (entropy_bits, checksum_bits) = match tokens.len() {
+        12 => (128usize, 4u32),
+        24 => (256usize, 8u32),
+        _ => return false,
+    };
+
+    // Pack the 11-bit indices, MSB-first, into a byte buffer. `acc` holds
+    // up to 7 carryover bits between iterations; with at most 11 fresh bits
+    // added per iteration the accumulator never exceeds 18 bits, so a u32
+    // is more than sufficient.
+    let total_bits = tokens.len() * 11;
+    let mut bits: Vec<u8> = Vec::with_capacity(total_bits.div_ceil(8));
+    let mut acc: u32 = 0;
+    let mut acc_len: u32 = 0;
+    for word in &tokens {
+        let Some(&idx) = BIP39_ENGLISH.get(word) else {
+            return false;
+        };
+        acc = (acc << 11) | u32::from(idx);
+        acc_len += 11;
+        while acc_len >= 8 {
+            acc_len -= 8;
+            bits.push(((acc >> acc_len) & 0xFF) as u8);
+        }
+    }
+    // Any leftover sub-byte sits in the low `acc_len` bits of `acc` and
+    // forms the high bits of the trailing checksum byte. For 12 words this
+    // is the 4 checksum bits; for 24 words `acc_len` is 0 and this branch
+    // is skipped.
+    if acc_len > 0 {
+        bits.push(((acc << (8 - acc_len)) & 0xFF) as u8);
+    }
+
+    let entropy_bytes = entropy_bits / 8;
+    let entropy = &bits[..entropy_bytes];
+    let actual_checksum = bits[entropy_bytes];
+
+    let digest = Sha256::digest(entropy);
+    let expected_checksum = digest[0];
+
+    // Mask off the high `checksum_bits` of the comparison byte. For 4-bit
+    // checksums (12 words) we only compare the high nibble; for 8-bit
+    // checksums (24 words) the mask is 0xFF.
+    let mask: u8 = if checksum_bits == 8 {
+        0xFF
+    } else {
+        0xFFu8 << (8 - checksum_bits)
+    };
+    (actual_checksum & mask) == (expected_checksum & mask)
 }
 
 // ---------------------------------------------------------------------------
@@ -416,5 +513,133 @@ mod tests {
     #[test]
     fn validate_wif_rejects_empty_string() {
         assert!(!validate_wif(""));
+    }
+
+    // -----------------------------------------------------------------
+    // BIP-39 mnemonic validation
+    //
+    // Test vectors below are drawn from the Trezor `python-mnemonic`
+    // reference vectors (the canonical BIP-39 test set). Each entry
+    // pairs an entropy hex string with the mnemonic string the
+    // reference implementation produces. We only need the mnemonics
+    // here — we are not deriving seeds.
+    // -----------------------------------------------------------------
+
+    /// All-zero entropy, 12 words. The most widely cited BIP-39 test vector.
+    const TREZOR_12_ZEROS: &str =
+        "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+    /// All-zero entropy, 24 words.
+    const TREZOR_24_ZEROS: &str =
+        "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+         abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+         abandon art";
+
+    /// Trezor vector, 12 words, entropy `7f7f...7f7f`.
+    const TREZOR_12_LEGAL_WINNER: &str =
+        "legal winner thank year wave sausage worth useful legal winner thank yellow";
+
+    /// Trezor vector, 24 words, entropy `7f7f...7f7f`.
+    const TREZOR_24_LEGAL_WINNER: &str =
+        "legal winner thank year wave sausage worth useful legal winner thank year wave sausage \
+         worth useful legal winner thank year wave sausage worth title";
+
+    /// Trezor vector, 12 words, entropy `8080...8080`.
+    const TREZOR_12_LETTER: &str =
+        "letter advice cage absurd amount doctor acoustic avoid letter advice cage above";
+
+    /// Trezor vector, 24 words, entropy `ffff...ffff`.
+    const TREZOR_24_ZOO: &str =
+        "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo \
+         zoo vote";
+
+    #[test]
+    fn validate_bip39_accepts_trezor_12_zero_vector() {
+        assert!(validate_bip39_english(TREZOR_12_ZEROS));
+    }
+
+    #[test]
+    fn validate_bip39_accepts_trezor_24_zero_vector() {
+        assert!(validate_bip39_english(TREZOR_24_ZEROS));
+    }
+
+    #[test]
+    fn validate_bip39_accepts_additional_trezor_vectors() {
+        assert!(validate_bip39_english(TREZOR_12_LEGAL_WINNER));
+        assert!(validate_bip39_english(TREZOR_24_LEGAL_WINNER));
+        assert!(validate_bip39_english(TREZOR_12_LETTER));
+        assert!(validate_bip39_english(TREZOR_24_ZOO));
+    }
+
+    #[test]
+    fn validate_bip39_tolerates_extra_whitespace() {
+        // Tabs, multiple spaces, and leading/trailing whitespace must not
+        // change the outcome — `split_ascii_whitespace` collapses runs.
+        let messy = format!("  {}  ", TREZOR_12_ZEROS.replace(' ', "\t  "));
+        assert!(validate_bip39_english(&messy));
+    }
+
+    #[test]
+    fn validate_bip39_rejects_swapped_last_word_breaking_checksum() {
+        // Swap the 12th word ("about" → "abandon"). All tokens are still in
+        // the wordlist, but the checksum no longer matches.
+        let bad = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+                   abandon abandon abandon";
+        assert!(!validate_bip39_english(bad));
+    }
+
+    #[test]
+    fn validate_bip39_rejects_swapped_internal_word_breaking_checksum() {
+        // Replace word 5 with another wordlist entry. Almost every such
+        // substitution breaks the 4-bit checksum (probability 15/16).
+        let bad = "abandon abandon abandon abandon zoo abandon abandon abandon abandon \
+                   abandon abandon about";
+        assert!(!validate_bip39_english(bad));
+    }
+
+    #[test]
+    fn validate_bip39_rejects_non_wordlist_token() {
+        let bad = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+                   abandon abandon zzzzz";
+        assert!(!validate_bip39_english(bad));
+    }
+
+    #[test]
+    fn validate_bip39_rejects_uppercase() {
+        // The wordlist is lowercase; any uppercase token fails the lookup.
+        let bad =
+            "Abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+                   abandon about";
+        assert!(!validate_bip39_english(bad));
+    }
+
+    #[test]
+    fn validate_bip39_rejects_disallowed_word_counts() {
+        // 11, 13, 15, 18, 21, 23, 25 — all rejected. 15/18/21 are valid
+        // BIP-39 lengths but deliberately out of scope for the MVP.
+        for &len in &[0usize, 1, 11, 13, 15, 18, 21, 23, 25] {
+            let mnemonic = vec!["abandon"; len].join(" ");
+            assert!(
+                !validate_bip39_english(&mnemonic),
+                "expected rejection at {len} words"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_bip39_rejects_empty_string() {
+        assert!(!validate_bip39_english(""));
+        assert!(!validate_bip39_english("   "));
+    }
+
+    #[test]
+    fn validate_bip39_rejects_typical_english_prose() {
+        // A random 12-token English sentence whose words happen to all live
+        // in the wordlist would still need to satisfy the checksum (1/16
+        // chance for 12-word, 1/256 for 24-word). Pure prose almost never
+        // contains 12 consecutive wordlist words at all, so this is the
+        // common rejection path.
+        let prose = "the quick brown fox jumps over the lazy dog and then runs";
+        assert!(!validate_bip39_english(prose));
     }
 }

@@ -81,6 +81,8 @@ fn secret_type_label(st: &crate::models::SecretType) -> &str {
         GenericApiKey => "generic-api-key",
         GenericHighEntropy => "generic-high-entropy",
         BitcoinPrivateKey => "bitcoin-private-key",
+        BitcoinSeed => "bitcoin-seed",
+        LightningSecret => "lightning-secret",
         Custom(name) => name.as_str(),
     }
 }
@@ -96,6 +98,7 @@ fn source_type_label(st: &crate::models::SourceType) -> &'static str {
         ApplicationConfig => "app config",
         Clipboard => "clipboard",
         BrowserStorage => "browser storage",
+        Bitcoin => "bitcoin / lightning",
     }
 }
 

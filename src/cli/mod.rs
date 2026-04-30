@@ -22,6 +22,7 @@ use clap::{Parser, Subcommand};
 
 use crate::cache::{self, CacheEntry, ScanCache};
 use crate::collectors::app_config::AppConfigCollector;
+use crate::collectors::bitcoin::BitcoinCollector;
 use crate::collectors::browser::BrowserCollector;
 use crate::collectors::clipboard::ClipboardCollector;
 use crate::collectors::cloud_cli::CloudCliCollector;
@@ -777,9 +778,10 @@ fn parse_cli_source(s: &str) -> Result<SourceType, String> {
         "app" => Ok(SourceType::ApplicationConfig),
         "clipboard" => Ok(SourceType::Clipboard),
         "browser" => Ok(SourceType::BrowserStorage),
+        "bitcoin" => Ok(SourceType::Bitcoin),
         other => Err(format!(
             "Unknown source '{other}': expected one of \
-             shell, dotfile, env, cloud, ssh, app, clipboard, browser"
+             shell, dotfile, env, cloud, ssh, app, clipboard, browser, bitcoin"
         )),
     }
 }
@@ -797,6 +799,7 @@ fn available_collectors() -> Vec<Box<dyn Collector>> {
         Box::new(FishHistoryCollector),
         Box::new(ClipboardCollector),
         Box::new(BrowserCollector),
+        Box::new(BitcoinCollector),
     ];
     candidates
         .into_iter()
@@ -1276,6 +1279,7 @@ mod tests {
             parse_cli_source("browser").unwrap(),
             SourceType::BrowserStorage
         );
+        assert_eq!(parse_cli_source("bitcoin").unwrap(), SourceType::Bitcoin);
     }
 
     #[test]

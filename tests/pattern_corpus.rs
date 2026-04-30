@@ -316,12 +316,17 @@ fn corpus_bitcoin_wif() {
     run_corpus_test("bitcoin-wif");
 }
 
-/// Sanity check: all 44 patterns compile successfully from a single RegexSet.
+#[test]
+fn corpus_bitcoin_bip39_mnemonic() {
+    run_corpus_test("bitcoin-bip39-mnemonic");
+}
+
+/// Sanity check: all 45 patterns compile successfully from a single RegexSet.
 #[test]
 fn all_patterns_compile_in_regex_set() {
     use regex::RegexSet;
     let patterns = all_patterns();
-    assert_eq!(patterns.len(), 44, "Expected exactly 44 patterns");
+    assert_eq!(patterns.len(), 45, "Expected exactly 45 patterns");
     let regexes: Vec<&str> = patterns.iter().map(|p| p.regex.as_str()).collect();
     RegexSet::new(&regexes).expect("One or more patterns failed to compile in RegexSet");
 }

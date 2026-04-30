@@ -44,6 +44,7 @@ pub enum ScanTarget {
     SshKeys,
     Clipboard,
     BrowserStorage,
+    BitcoinFiles,
 }
 
 impl ScanTarget {
@@ -58,6 +59,7 @@ impl ScanTarget {
             Self::SshKeys => "SSH keys (~/.ssh/)",
             Self::Clipboard => "Clipboard history (privacy-sensitive)",
             Self::BrowserStorage => "Browser localStorage (privacy-sensitive)",
+            Self::BitcoinFiles => "Bitcoin / Lightning files (~/.lightning/, ~/.lnd/)",
         }
     }
 
@@ -81,6 +83,7 @@ impl ScanTarget {
             Self::CloudConfigs,
             Self::AppConfigs,
             Self::SshKeys,
+            Self::BitcoinFiles,
             Self::Clipboard,
             Self::BrowserStorage,
         ]
@@ -143,6 +146,7 @@ pub fn targets_to_source_types(targets: &[ScanTarget]) -> Vec<SourceType> {
             ScanTarget::SshKeys => vec![SourceType::SshKey],
             ScanTarget::Clipboard => vec![SourceType::Clipboard],
             ScanTarget::BrowserStorage => vec![SourceType::BrowserStorage],
+            ScanTarget::BitcoinFiles => vec![SourceType::Bitcoin],
         })
         .collect()
 }
@@ -185,6 +189,12 @@ pub fn secret_type_explanation(st: &SecretType) -> &'static str {
         }
         SecretType::BitcoinPrivateKey => {
             "A Bitcoin private key. Possession allows immediate, irreversible theft of all funds derivable from this key. Sweep funds to a freshly generated wallet — do not reuse this key."
+        }
+        SecretType::BitcoinSeed => {
+            "A Bitcoin seed phrase (BIP-39 mnemonic). Possession allows immediate, irreversible theft of every account derived from this seed. Generate a new seed on a clean, offline device and sweep all funds to the new wallet — do not reuse this seed."
+        }
+        SecretType::LightningSecret => {
+            "Lightning Network secret material (Core Lightning hsm_secret, LND admin.macaroon, or LND wallet.db). Possession of an hsm_secret or admin.macaroon allows immediate, irreversible theft and full node control."
         }
         SecretType::Custom(_) => "A secret matched by a user-defined detection rule.",
     }
@@ -259,6 +269,8 @@ fn print_finding(finding: &Finding, index: usize, total: usize) {
             SecretType::GenericApiKey => "API Key",
             SecretType::GenericHighEntropy => "High-Entropy Secret",
             SecretType::BitcoinPrivateKey => "Bitcoin Private Key",
+            SecretType::BitcoinSeed => "Bitcoin Seed Phrase",
+            SecretType::LightningSecret => "Lightning Secret",
             SecretType::Custom(_) => unreachable!(),
         },
     };
@@ -683,8 +695,8 @@ mod tests {
     // --- ScanTarget ---
 
     #[test]
-    fn all_targets_returns_eight() {
-        assert_eq!(ScanTarget::all().len(), 8);
+    fn all_targets_returns_nine() {
+        assert_eq!(ScanTarget::all().len(), 9);
     }
 
     #[test]
@@ -701,6 +713,7 @@ mod tests {
         assert!(ScanTarget::CloudConfigs.default_enabled());
         assert!(ScanTarget::AppConfigs.default_enabled());
         assert!(ScanTarget::SshKeys.default_enabled());
+        assert!(ScanTarget::BitcoinFiles.default_enabled());
     }
 
     #[test]
@@ -725,16 +738,16 @@ mod tests {
     #[test]
     fn opt_in_targets_are_last() {
         let all = ScanTarget::all();
-        assert_eq!(all[6], ScanTarget::Clipboard);
-        assert_eq!(all[7], ScanTarget::BrowserStorage);
+        assert_eq!(all[7], ScanTarget::Clipboard);
+        assert_eq!(all[8], ScanTarget::BrowserStorage);
     }
 
     // --- InteractiveState ---
 
     #[test]
-    fn default_state_has_six_targets() {
+    fn default_state_has_seven_targets() {
         let state = InteractiveState::default();
-        assert_eq!(state.targets.len(), 6);
+        assert_eq!(state.targets.len(), 7);
     }
 
     #[test]
@@ -774,7 +787,7 @@ mod tests {
         state.targets.push(ScanTarget::BrowserStorage);
         assert!(state.has_clipboard());
         assert!(state.has_browser());
-        assert_eq!(state.targets.len(), 8);
+        assert_eq!(state.targets.len(), 9);
     }
 
     // --- InteractiveSession ---
@@ -782,7 +795,7 @@ mod tests {
     #[test]
     fn session_creates_with_default_targets() {
         let session = InteractiveSession::new();
-        assert_eq!(session.state.targets.len(), 6);
+        assert_eq!(session.state.targets.len(), 7);
     }
 
     #[test]
@@ -798,7 +811,7 @@ mod tests {
     fn targets_to_source_types_maps_all_variants() {
         let all = ScanTarget::all();
         let sources = targets_to_source_types(&all);
-        assert_eq!(sources.len(), 8);
+        assert_eq!(sources.len(), 9);
         assert!(sources.contains(&SourceType::ShellHistory));
         assert!(sources.contains(&SourceType::Dotfile));
         assert!(sources.contains(&SourceType::EnvFile));
@@ -807,6 +820,7 @@ mod tests {
         assert!(sources.contains(&SourceType::SshKey));
         assert!(sources.contains(&SourceType::Clipboard));
         assert!(sources.contains(&SourceType::BrowserStorage));
+        assert!(sources.contains(&SourceType::Bitcoin));
     }
 
     #[test]

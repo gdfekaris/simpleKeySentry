@@ -467,6 +467,7 @@ remediation = "rotate"
 
     // 17
     #[test]
+    #[allow(clippy::invalid_regex)] // intentionally invalid: exercises the error path
     fn rules_test_invalid_regex_returns_error() {
         // Verify that Regex::new fails for an invalid pattern (used by run_rules_test)
         assert!(regex::Regex::new("[invalid").is_err());
@@ -476,6 +477,6 @@ remediation = "rotate"
     #[test]
     fn rules_list_shows_builtin_count() {
         let patterns = crate::detection::patterns::all_patterns();
-        assert_eq!(patterns.len(), 44, "expected 44 built-in patterns");
+        assert_eq!(patterns.len(), 45, "expected 45 built-in patterns");
     }
 }

@@ -14,12 +14,13 @@ A privacy-first local secrets scanner. Finds leaked credentials in shell history
 - **Cloud CLI configs** — AWS credentials/config, GCP application default credentials, Azure profile, Docker config, Kubernetes kubeconfig, GitHub CLI and Hub configs
 - **Application configs** — `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, `.my.cnf`, Cargo credentials, Gem credentials
 - **SSH keys** — unencrypted private keys, permissive file/directory permissions, authorized_keys audit, known_hosts plaintext hostnames
+- **Bitcoin / Lightning** — Core Lightning `hsm_secret` and LND `admin.macaroon`/`wallet.db` files (path-presence; mainnet, testnet, regtest)
 - **Clipboard** (opt-in) — pasteboard contents and clipboard manager databases (Clipy, CopyQ, GPaste)
 - **Browser localStorage** (opt-in) — Chrome, Chromium, Brave, Edge (LevelDB), and Firefox (SQLite)
 
 ## What it detects
 
-42 built-in patterns covering:
+45 built-in patterns covering:
 
 - AWS access keys and secret keys
 - GitHub personal access tokens (classic and fine-grained), OAuth tokens, and App private keys
@@ -42,6 +43,8 @@ A privacy-first local secrets scanner. Finds leaked credentials in shell history
 - Basic-auth URLs
 - Docker registry auth tokens
 - Generic bearer tokens and high-entropy secrets
+- Bitcoin self-custody material — extended private keys (`xprv`/`yprv`/`zprv`/`tprv`), WIF private keys, and BIP-39 English mnemonic seed phrases (12 or 24 words, checksum-validated)
+- Lightning Network secrets (path-presence) — Core Lightning `hsm_secret`, LND `admin.macaroon`, LND `wallet.db` across mainnet/testnet/regtest
 
 Each match is scored with a confidence pipeline that combines regex pattern matching, Shannon entropy analysis, and 8 contextual heuristics to reduce false positives.
 
@@ -145,7 +148,7 @@ You can also place a `.sks.toml` in any project directory for project-specific s
 | `--no-cache` | Disable incremental scanning cache (force full scan) |
 | `--clipboard` | Scan clipboard contents (opt-in) |
 | `--browser` | Scan browser localStorage (opt-in) |
-| `--sources <LIST>` | Comma-separated sources to scan: `shell,dotfile,env,cloud,ssh,app,clipboard,browser` |
+| `--sources <LIST>` | Comma-separated sources to scan: `shell,dotfile,env,cloud,ssh,app,bitcoin,clipboard,browser` |
 | `--rules-path <PATH>` | Path to a custom rules TOML file |
 
 ## Incremental scanning

@@ -54,6 +54,8 @@ fn secret_type_str(st: &crate::models::SecretType) -> String {
         GenericApiKey => "generic-api-key".into(),
         GenericHighEntropy => "generic-high-entropy".into(),
         BitcoinPrivateKey => "bitcoin-private-key".into(),
+        BitcoinSeed => "bitcoin-seed".into(),
+        LightningSecret => "lightning-secret".into(),
         Custom(name) => name.clone(),
     }
 }
@@ -69,6 +71,7 @@ fn source_type_str(st: &crate::models::SourceType) -> &'static str {
         ApplicationConfig => "app config",
         Clipboard => "clipboard",
         BrowserStorage => "browser storage",
+        Bitcoin => "bitcoin / lightning",
     }
 }
 

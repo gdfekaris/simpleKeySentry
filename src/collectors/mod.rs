@@ -1,4 +1,5 @@
 pub mod app_config;
+pub mod bitcoin;
 pub mod browser;
 pub mod clipboard;
 pub mod cloud_cli;

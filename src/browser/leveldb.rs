@@ -720,7 +720,7 @@ mod tests {
     #[test]
     fn parse_internal_key_deletion_type() {
         let mut key = b"deleted_key".to_vec();
-        let packed: u64 = (100 << 8) | 0;
+        let packed: u64 = 100 << 8;
         key.extend_from_slice(&packed.to_le_bytes());
 
         let (user_key, seq, vtype) = parse_internal_key(&key).unwrap();
@@ -1053,7 +1053,7 @@ mod tests {
     fn read_sstable_too_small() {
         let dir = tempfile::tempdir().unwrap();
         let sst_path = dir.path().join("tiny.ldb");
-        fs::write(&sst_path, &[0u8; 10]).unwrap();
+        fs::write(&sst_path, [0u8; 10]).unwrap();
 
         assert!(read_sstable(&sst_path).is_err());
     }
@@ -1172,7 +1172,7 @@ mod tests {
     fn corrupt_sstable_skipped_gracefully() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("CURRENT"), "MANIFEST-000001\n").unwrap();
-        fs::write(dir.path().join("000001.ldb"), &[0xDE, 0xAD]).unwrap();
+        fs::write(dir.path().join("000001.ldb"), [0xDE, 0xAD]).unwrap();
 
         let reader = LevelDbReader::open(dir.path()).unwrap();
         // Should not panic — corrupt files are skipped with a warning

@@ -1,4 +1,4 @@
-use crate::detection::bitcoin::{validate_wif, validate_xprv};
+use crate::detection::bitcoin::{validate_bip39_english, validate_wif, validate_xprv};
 use crate::detection::PatternRule;
 use crate::models::SecretType;
 
@@ -568,6 +568,31 @@ pub fn all_patterns() -> Vec<PatternRule> {
                  this key — Bitcoin keys cannot be rotated, only abandoned."
                     .to_string(),
             validator: Some(validate_wif),
+        },
+        // 45 ── Bitcoin BIP-39 English mnemonic (12 or 24 words, valid checksum)
+        //
+        // The regex is a cheap shape filter: any run of 12 to 24 lowercase
+        // ASCII tokens. The validator does the real work, re-deriving the
+        // BIP-39 checksum from the wordlist indices and rejecting anything
+        // that isn't an exact 12- or 24-word mnemonic. The greedy `{11,23}`
+        // quantifier ensures a 24-word seed is captured as 24 words; if a
+        // run is 13–23 words long the validator rejects it on count.
+        //
+        // Lowercase-only is deliberate: BIP-39 is technically case-insensitive
+        // under NFKD, but conventional storage is lowercase, and restricting
+        // to `[a-z]` cuts false-positive volume on prose dramatically.
+        PatternRule {
+            name: "bitcoin-bip39-mnemonic".to_string(),
+            description: "Bitcoin Seed Phrase (BIP-39 mnemonic)".to_string(),
+            regex: r"\b([a-z]+(?:\s+[a-z]+){11,23})\b".to_string(),
+            secret_type: SecretType::BitcoinSeed,
+            base_confidence: 1.0,
+            remediation:
+                "Generate a new seed on a clean, offline device and sweep all funds derived from \
+                 this seed to the new wallet. Treat every address ever derived from this seed as \
+                 compromised forever — do not import this mnemonic into any new wallet."
+                    .to_string(),
+            validator: Some(validate_bip39_english),
         },
     ]
 }

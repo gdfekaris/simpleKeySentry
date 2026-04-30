@@ -1,0 +1,25 @@
+# BIP-39 English mnemonic test vectors (Trezor / python-mnemonic reference set).
+# Every line is a real 12- or 24-word mnemonic with a valid checksum. The
+# validator must accept all of these.
+
+# 12 words, entropy 0x00000000000000000000000000000000
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+
+# 12 words, entropy 0x7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f
+legal winner thank year wave sausage worth useful legal winner thank yellow
+
+# 12 words, entropy 0x80808080808080808080808080808080
+letter advice cage absurd amount doctor acoustic avoid letter advice cage above
+
+# 24 words, entropy all zeros
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art
+
+# 24 words, entropy 0x7f7f7f7f...
+legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title
+
+# 24 words, entropy all 0xff
+zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote
+
+# 12-word valid mnemonic embedded inside an assignment-style line — the regex
+# must still capture the run and the validator must still accept it.
+SEED="abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"

@@ -1,0 +1,31 @@
+# Lines that resemble mnemonic shape but must NOT survive validation.
+# Some have only wordlist words but a broken checksum; others are ordinary
+# English prose with a long lowercase run.
+
+# Same all-abandon prefix as the canonical test vector but with the 12th word
+# changed to "abandon" — checksum is wrong (the correct last word is "about").
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon
+
+# 24 abandons in a row (the canonical 24-word vector ends in "art").
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon
+
+# 12 zoos — the correct 12-word ffff-entropy mnemonic ends in "wrong".
+zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo
+
+# Internal-word swap: word 5 replaced with another wordlist entry.
+abandon abandon abandon abandon zoo abandon abandon abandon abandon abandon abandon about
+
+# Real-vector but with one non-wordlist token slipped in (gibberish word).
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon zzzzz
+
+# Long prose runs of 12+ ordinary lowercase English words. Almost none of these
+# will be wordlist members, so the validator rejects on the first lookup.
+the quick brown fox jumps over the lazy dog and then runs through the dewy field
+this is a very long sentence written deliberately to contain more than twelve lowercase words in a row without any kind of punctuation breaking it up
+when in the course of human events it becomes necessary for one people to dissolve the political bands that have connected them with another
+
+# 12 wordlist words but ordered randomly — checksum almost certainly fails.
+ability ability ability ability ability ability ability ability ability ability ability ability
+
+# Uppercase tokens — regex restricts to [a-z], so this must not match.
+ABANDON ABANDON ABANDON ABANDON ABANDON ABANDON ABANDON ABANDON ABANDON ABANDON ABANDON ABOUT
