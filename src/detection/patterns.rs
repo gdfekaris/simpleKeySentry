@@ -14,6 +14,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this key in the AWS IAM console and audit CloudTrail for unauthorized use."
                     .to_string(),
+            validator: None,
         },
         // 2 ── AWS Secret Access Key
         PatternRule {
@@ -25,6 +26,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this key in the AWS IAM console and audit CloudTrail for unauthorized use."
                     .to_string(),
+            validator: None,
         },
         // 3 ── GitHub PAT (classic — ghp_ / ghs_)
         PatternRule {
@@ -36,6 +38,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this token at https://github.com/settings/tokens and rotate dependent services."
                     .to_string(),
+            validator: None,
         },
         // 4 ── GitHub OAuth token
         PatternRule {
@@ -47,6 +50,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this OAuth token at https://github.com/settings/applications."
                     .to_string(),
+            validator: None,
         },
         // 5 ── GitHub fine-grained PAT
         PatternRule {
@@ -58,6 +62,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this token at https://github.com/settings/tokens and rotate dependent services."
                     .to_string(),
+            validator: None,
         },
         // 6 ── Stripe secret (live) key
         PatternRule {
@@ -69,6 +74,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this key in the Stripe dashboard and audit recent API activity."
                     .to_string(),
+            validator: None,
         },
         // 7 ── Stripe test key
         PatternRule {
@@ -80,6 +86,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Test keys carry no financial risk but must not be committed. Remove from source."
                     .to_string(),
+            validator: None,
         },
         // 8 ── Slack bot token
         PatternRule {
@@ -89,6 +96,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             secret_type: SecretType::SlackToken,
             base_confidence: 0.95,
             remediation: "Revoke this token in the Slack app settings and rotate it.".to_string(),
+            validator: None,
         },
         // 9 ── Slack user token
         PatternRule {
@@ -98,6 +106,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             secret_type: SecretType::SlackToken,
             base_confidence: 0.95,
             remediation: "Revoke this token in the Slack app settings and rotate it.".to_string(),
+            validator: None,
         },
         // 10 ── PEM private key header
         PatternRule {
@@ -109,6 +118,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke and regenerate this key. Remove it from all source files and git history."
                     .to_string(),
+            validator: None,
         },
         // 11 ── JSON Web Token
         PatternRule {
@@ -120,6 +130,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Invalidate this JWT and rotate the signing key if it has been exposed."
                     .to_string(),
+            validator: None,
         },
         // 12 ── Database URL with credentials
         PatternRule {
@@ -131,6 +142,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate the database password and move credentials to environment variables or a secrets manager."
                     .to_string(),
+            validator: None,
         },
         // 13 ── Generic connection string
         PatternRule {
@@ -141,6 +153,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             base_confidence: 0.88,
             remediation:
                 "Move these credentials to environment variables or a secrets manager.".to_string(),
+            validator: None,
         },
         // 14 ── Heroku API key
         PatternRule {
@@ -152,6 +165,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this key in the Heroku dashboard under Account Settings > API Key."
                     .to_string(),
+            validator: None,
         },
         // 15 ── SendGrid API key
         PatternRule {
@@ -163,6 +177,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this key in the SendGrid dashboard and rotate dependent services."
                     .to_string(),
+            validator: None,
         },
         // 16 ── Twilio API key
         PatternRule {
@@ -173,6 +188,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             base_confidence: 0.90,
             remediation:
                 "Revoke this key in the Twilio console and rotate dependent services.".to_string(),
+            validator: None,
         },
         // 17 ── npm access token
         PatternRule {
@@ -182,6 +198,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             secret_type: SecretType::GenericApiKey,
             base_confidence: 0.95,
             remediation: "Revoke this token at https://www.npmjs.com/settings/tokens.".to_string(),
+            validator: None,
         },
         // 18 ── PyPI API token
         PatternRule {
@@ -193,6 +210,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this token at https://pypi.org/manage/account/token/ and rotate CI pipelines."
                     .to_string(),
+            validator: None,
         },
         // 19 ── HTTP Authorization Bearer token
         PatternRule {
@@ -203,6 +221,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             base_confidence: 0.65,
             remediation:
                 "Rotate the token and remove it from any logged or stored HTTP headers.".to_string(),
+            validator: None,
         },
         // 20 ── Shell export of a secret variable
         PatternRule {
@@ -214,6 +233,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Move secrets out of shell scripts and into a secrets manager or encrypted vault."
                     .to_string(),
+            validator: None,
         },
         // =====================================================================
         // Block 15 — Expanded Pattern Library (patterns 21–42)
@@ -231,6 +251,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Delete this service account key in the GCP IAM console and create a new one."
                     .to_string(),
+            validator: None,
         },
         // 22 ── GCP OAuth Refresh Token
         PatternRule {
@@ -243,6 +264,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this refresh token in the GCP OAuth consent screen and rotate credentials."
                     .to_string(),
+            validator: None,
         },
         // 23 ── Azure Client Secret
         PatternRule {
@@ -254,6 +276,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this secret in Azure AD app registrations and update dependent services."
                     .to_string(),
+            validator: None,
         },
         // 24 ── Azure Storage Key
         PatternRule {
@@ -265,6 +288,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this storage key in the Azure portal and update connection strings."
                     .to_string(),
+            validator: None,
         },
         // 25 ── Azure SAS Token
         PatternRule {
@@ -276,6 +300,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Regenerate the SAS token and revoke the old one via the Azure portal."
                     .to_string(),
+            validator: None,
         },
         // 26 ── DigitalOcean Token
         PatternRule {
@@ -287,6 +312,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this token in the DigitalOcean API settings and generate a new one."
                     .to_string(),
+            validator: None,
         },
         //
         // Batch B — Git Platforms
@@ -301,6 +327,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this token in GitLab User Settings > Access Tokens and rotate it."
                     .to_string(),
+            validator: None,
         },
         // 28 ── GitLab Pipeline Trigger Token
         PatternRule {
@@ -312,6 +339,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this trigger token in GitLab CI/CD Settings > Pipeline triggers."
                     .to_string(),
+            validator: None,
         },
         // 29 ── Bitbucket App Password
         PatternRule {
@@ -323,6 +351,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this app password in Bitbucket Personal Settings > App passwords."
                     .to_string(),
+            validator: None,
         },
         //
         // Batch C — SaaS / API Keys
@@ -337,6 +366,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this token in the Shopify Partner Dashboard or admin app settings."
                     .to_string(),
+            validator: None,
         },
         // 31 ── Mailgun API Key
         PatternRule {
@@ -349,6 +379,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this API key in the Mailgun dashboard under Settings > API Keys."
                     .to_string(),
+            validator: None,
         },
         // 32 ── Datadog API Key
         PatternRule {
@@ -361,6 +392,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this API key in the Datadog Organization Settings and generate a new one."
                     .to_string(),
+            validator: None,
         },
         // 33 ── HashiCorp Vault Token
         PatternRule {
@@ -372,6 +404,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this Vault token and audit the Vault audit log for unauthorized access."
                     .to_string(),
+            validator: None,
         },
         // 34 ── HashiCorp Terraform Cloud Token
         PatternRule {
@@ -383,6 +416,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this token in Terraform Cloud under User Settings > Tokens."
                     .to_string(),
+            validator: None,
         },
         //
         // Batch D — AI Providers
@@ -398,6 +432,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Revoke this key at https://platform.openai.com/api-keys and generate a new one."
                     .to_string(),
+            validator: None,
         },
         // 36 ── Anthropic API Key
         PatternRule {
@@ -408,6 +443,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             base_confidence: 0.98,
             remediation:
                 "Revoke this key in the Anthropic Console and generate a new one.".to_string(),
+            validator: None,
         },
         //
         // Batch E — Infrastructure
@@ -422,6 +458,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Remove this auth entry from Docker config and use credential helpers instead."
                     .to_string(),
+            validator: None,
         },
         // 38 ── Kubernetes Bearer Token
         PatternRule {
@@ -433,6 +470,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Rotate this service account token and audit RBAC bindings in the cluster."
                     .to_string(),
+            validator: None,
         },
         // 39 ── SSH Unencrypted Private Key Header
         PatternRule {
@@ -445,6 +483,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Encrypt this key with a passphrase or regenerate it. Remove from source control."
                     .to_string(),
+            validator: None,
         },
         // 40 ── age Secret Key
         PatternRule {
@@ -456,6 +495,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Generate a new age key and re-encrypt any files that used the old key."
                     .to_string(),
+            validator: None,
         },
         // 41 ── GitHub App Private Key
         PatternRule {
@@ -468,6 +508,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Regenerate this key in the GitHub App settings and update all consumers."
                     .to_string(),
+            validator: None,
         },
         // 42 ── Basic Auth URL
         PatternRule {
@@ -479,6 +520,7 @@ pub fn all_patterns() -> Vec<PatternRule> {
             remediation:
                 "Move credentials out of URLs and into environment variables or a secrets manager."
                     .to_string(),
+            validator: None,
         },
     ]
 }

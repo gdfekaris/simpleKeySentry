@@ -125,6 +125,7 @@ pub fn parse_custom_rules(toml_content: &str) -> Result<Vec<PatternRule>, SksErr
             regex: tr.regex,
             base_confidence: confidence,
             remediation: tr.remediation,
+            validator: None,
         });
     }
 

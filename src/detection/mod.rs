@@ -1,3 +1,4 @@
+pub mod bitcoin;
 pub mod custom_rules;
 pub mod entropy;
 pub mod heuristics;
@@ -28,6 +29,12 @@ pub struct PatternRule {
     /// Starting confidence score before pipeline adjustments. Range [0.0, 1.0].
     pub base_confidence: f64,
     pub remediation: String,
+    /// Optional hard validator. If `Some(f)` and `f(matched_text)` returns
+    /// `false`, the candidate is dropped before entering the confidence
+    /// pipeline (no entropy adjustment, no heuristics, no Finding emitted).
+    /// Used for patterns whose format embeds a checksum (Bitcoin xprv, WIF,
+    /// BIP-39 mnemonics, etc.).
+    pub validator: Option<fn(&str) -> bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +190,15 @@ impl DetectionEngine {
                     continue;
                 }
 
+                // Hard validator gate: drop candidates that fail format-level
+                // checks (e.g. base58check, BIP-39 checksum) before any
+                // confidence math runs.
+                if let Some(validate) = compiled.rule.validator {
+                    if !validate(matched_str) {
+                        continue;
+                    }
+                }
+
                 let confidence = self.compute_confidence(&compiled.rule, matched_str, item);
 
                 let location = SourceLocation {
@@ -288,6 +304,7 @@ mod tests {
             secret_type: SecretType::GenericApiKey,
             base_confidence: 0.90,
             remediation: "Remove the test secret.".to_string(),
+            validator: None,
         }
     }
 
@@ -359,6 +376,7 @@ mod tests {
             secret_type: SecretType::GenericApiKey,
             base_confidence: 1.5,
             remediation: "N/A".to_string(),
+            validator: None,
         };
         let engine = DetectionEngine::new(vec![CompiledPattern::compile(rule).unwrap()]);
         let findings = engine.analyze(&make_item("OVERCONF_ABCD"));
@@ -374,6 +392,7 @@ mod tests {
             secret_type: SecretType::GenericApiKey,
             base_confidence: -0.5,
             remediation: "N/A".to_string(),
+            validator: None,
         };
         let engine = DetectionEngine::new(vec![CompiledPattern::compile(rule).unwrap()]);
         let findings = engine.analyze(&make_item("ZEROCONF_ABCD"));
@@ -415,6 +434,7 @@ mod tests {
             secret_type: SecretType::GenericApiKey,
             base_confidence: 0.5,
             remediation: "N/A".to_string(),
+            validator: None,
         };
         assert!(CompiledPattern::compile(rule).is_err());
     }
